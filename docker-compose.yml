@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: macacha
+      POSTGRES_PASSWORD: macacha
+      POSTGRES_DB: macacha
+    ports:
+      - "5432:5432"
+    volumes:
+      - macacha_pgdata:/var/lib/postgresql/data
+      - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql
+      - ./backend/db/init_test_db.sql:/docker-entrypoint-initdb.d/20-test-db.sql
+
+volumes:
+  macacha_pgdata:
