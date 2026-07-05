@@ -79,6 +79,25 @@ def test_ingest_tramite_generates_faqs_when_missing(db_conn, clean_db):
     assert len(llamadas) == 1
 
 
+def test_ingest_tramite_is_idempotent_even_with_nondeterministic_faq_generation(db_conn, clean_db):
+    llamadas = []
+
+    def faq_fn_no_deterministico(**kwargs):
+        llamadas.append(kwargs)
+        return [{"pregunta": "p", "respuesta": f"respuesta variante {len(llamadas)}"}]
+
+    raw = _raw_tramite(id="RC-0003", preguntas_frecuentes=[])
+
+    primero = ingest_tramite(raw, db_conn, _fake_embed_fn, faq_fn_no_deterministico)
+    db_conn.commit()
+    segundo = ingest_tramite(raw, db_conn, _fake_embed_fn, faq_fn_no_deterministico)
+    db_conn.commit()
+
+    assert primero == "nuevo"
+    assert segundo == "sin_cambios"
+    assert len(llamadas) == 1
+
+
 def test_ingest_file_returns_summary_counts(tmp_path, db_conn, clean_db):
     raw_tramites = [
         _raw_tramite(),

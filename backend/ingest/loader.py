@@ -7,15 +7,14 @@ from ingest.snapshot_builder import build_snapshot
 
 
 def ingest_tramite(raw_tramite: dict, conn, embed_fn, faq_fn) -> str:
-    snapshot = build_snapshot(raw_tramite, faq_fn)
-    content_hash = compute_content_hash(snapshot)
+    content_hash = compute_content_hash(raw_tramite)
 
-    organismo_id = repo.upsert_organismo(conn, snapshot["organismo"])
+    organismo_id = repo.upsert_organismo(conn, raw_tramite["organismo"])
     repo.upsert_tramite(
-        conn, snapshot["id"], organismo_id, snapshot["categoria"], snapshot["nombre_oficial"]
+        conn, raw_tramite["id"], organismo_id, raw_tramite["categoria"], raw_tramite["tramite"]
     )
 
-    vigente = repo.get_vigente_version(conn, snapshot["id"])
+    vigente = repo.get_vigente_version(conn, raw_tramite["id"])
 
     if vigente is not None and vigente["content_hash"] == content_hash:
         return "sin_cambios"
@@ -24,10 +23,11 @@ def ingest_tramite(raw_tramite: dict, conn, embed_fn, faq_fn) -> str:
     if vigente is not None:
         repo.close_version(conn, vigente["id"])
 
+    snapshot = build_snapshot(raw_tramite, faq_fn)
     chunks = build_chunks(raw_tramite, snapshot)
-    embeddings = embed_fn([c["texto"] for c in chunks])
+    embeddings = embed_fn([c["texto"] for c in chunks]) if chunks else []
     repo.insert_version_with_chunks(
-        conn, snapshot["id"], numero_version, content_hash, snapshot, chunks, embeddings
+        conn, raw_tramite["id"], numero_version, content_hash, snapshot, chunks, embeddings
     )
 
     return "nuevo" if vigente is None else "nueva_version"
