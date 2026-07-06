@@ -96,3 +96,20 @@ def test_generate_faqs_parses_json_response():
         {"pregunta": "¿Cuánto cuesta?", "respuesta": "$6000."},
     ]
     assert fake_sdk.chat.completions.last_call["model"] == "gpt-4o-mini"
+
+
+def test_rerank_parses_json_response_as_order():
+    orden_json = json.dumps({"orden": [2, 0, 1]})
+    fake_sdk = _FakeOpenAISDK(vectors=[], faq_json_content=orden_json)
+    client = OpenAIClient(fake_sdk)
+
+    candidatos = [
+        {"texto": "fragmento A"},
+        {"texto": "fragmento B"},
+        {"texto": "fragmento C"},
+    ]
+
+    resultado = client.rerank("una pregunta cualquiera", candidatos)
+
+    assert resultado == [2, 0, 1]
+    assert fake_sdk.chat.completions.last_call["model"] == "gpt-4o-mini"

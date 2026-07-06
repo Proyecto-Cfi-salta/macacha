@@ -39,6 +39,26 @@ class OpenAIClient:
         data = json.loads(response.choices[0].message.content)
         return data["faqs"]
 
+    def rerank(self, query: str, candidatos: list[dict]) -> list[int]:
+        candidatos_numerados = "\n".join(
+            f"{i}. {candidato['texto']}" for i, candidato in enumerate(candidatos)
+        )
+        prompt = (
+            "Ordená los siguientes fragmentos por relevancia real a la pregunta del "
+            "usuario, del más relevante al menos relevante.\n\n"
+            f"Pregunta: {query}\n\n"
+            f"Fragmentos:\n{candidatos_numerados}\n\n"
+            'Respondé únicamente con JSON con esta forma: '
+            '{"orden": [<índices originales, del más al menos relevante>]}'
+        )
+        response = self._sdk_client.chat.completions.create(
+            model=self.FAQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(response.choices[0].message.content)
+        return data["orden"]
+
 
 def build_real_client() -> OpenAIClient:
     from openai import OpenAI
