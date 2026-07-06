@@ -27,6 +27,8 @@ def clean_db():
 
     def _clean() -> None:
         with conn.cursor() as cur:
+            cur.execute("DELETE FROM mensajes")
+            cur.execute("DELETE FROM sesiones")
             cur.execute("DELETE FROM tramite_chunks")
             cur.execute("DELETE FROM tramite_versiones")
             cur.execute("DELETE FROM tramites")

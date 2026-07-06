@@ -11,4 +11,11 @@ def test_extension_and_tables_exist(db_conn):
             """
         )
         tables = {row[0] for row in cur.fetchall()}
-        assert {"organismos", "tramites", "tramite_versiones", "tramite_chunks"} <= tables
+        assert {
+            "organismos",
+            "tramites",
+            "tramite_versiones",
+            "tramite_chunks",
+            "sesiones",
+            "mensajes",
+        } <= tables

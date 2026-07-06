@@ -42,3 +42,20 @@ CREATE INDEX IF NOT EXISTS tramite_chunks_version_idx ON tramite_chunks (version
 CREATE INDEX IF NOT EXISTS tramite_chunks_tsv_idx ON tramite_chunks USING GIN (tsv);
 CREATE INDEX IF NOT EXISTS tramite_chunks_embedding_idx ON tramite_chunks
     USING hnsw (embedding vector_cosine_ops);
+
+CREATE TABLE IF NOT EXISTS sesiones (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS mensajes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES sesiones(id),
+    rol TEXT NOT NULL,
+    contenido TEXT,
+    tool_calls JSONB,
+    tool_call_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS mensajes_session_idx ON mensajes (session_id, created_at);
