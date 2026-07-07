@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS sesiones (
 
 CREATE TABLE IF NOT EXISTS mensajes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    orden BIGSERIAL,
     session_id UUID NOT NULL REFERENCES sesiones(id),
     rol TEXT NOT NULL,
     contenido TEXT,
@@ -58,4 +59,7 @@ CREATE TABLE IF NOT EXISTS mensajes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS mensajes_session_idx ON mensajes (session_id, created_at);
+ALTER TABLE mensajes ADD COLUMN IF NOT EXISTS orden BIGSERIAL;
+
+DROP INDEX IF EXISTS mensajes_session_idx;
+CREATE INDEX IF NOT EXISTS mensajes_session_orden_idx ON mensajes (session_id, orden);

@@ -40,7 +40,7 @@ def obtener_historial(conn, session_id: str) -> list[dict]:
             SELECT rol, contenido, tool_calls, tool_call_id
             FROM mensajes
             WHERE session_id = %s
-            ORDER BY created_at
+            ORDER BY orden
             """,
             (session_id,),
         )
@@ -62,7 +62,7 @@ def obtener_mensajes_visibles(conn, session_id: str) -> list[dict]:
             SELECT rol, contenido, created_at
             FROM mensajes
             WHERE session_id = %s AND rol IN ('user', 'assistant') AND contenido IS NOT NULL
-            ORDER BY created_at
+            ORDER BY orden
             """,
             (session_id,),
         )
