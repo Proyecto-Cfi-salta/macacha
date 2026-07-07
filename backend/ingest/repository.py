@@ -94,3 +94,19 @@ def insert_version_with_chunks(
                 (version_id, chunk["tipo_chunk"], chunk["texto"], chunk["fuente_url"], embedding),
             )
     return str(version_id)
+
+
+def obtener_snapshot_vigente(conn, tramite_id: str) -> dict | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT snapshot
+            FROM tramite_versiones
+            WHERE tramite_id = %s AND es_vigente = true
+            """,
+            (tramite_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return None
+        return row[0]
