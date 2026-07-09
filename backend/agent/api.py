@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from functools import lru_cache
 from typing import Iterator
 
@@ -32,7 +33,7 @@ def obtener_openai_client():
 
 
 class ChatRequest(BaseModel):
-    session_id: str
+    session_id: uuid.UUID
     mensaje: str
 
 
@@ -45,21 +46,26 @@ def chat(
 ):
     def generar() -> Iterator[str]:
         with pool.connection() as conn:
-            for evento in procesar_turno(
-                conn,
-                chat_client,
-                openai_client.generate_embeddings,
-                openai_client.rerank,
-                request.session_id,
-                request.mensaje,
-            ):
-                yield f"data: {json.dumps(evento, ensure_ascii=False)}\n\n"
-            conn.commit()
+            try:
+                for evento in procesar_turno(
+                    conn,
+                    chat_client,
+                    openai_client.generate_embeddings,
+                    openai_client.rerank,
+                    str(request.session_id),
+                    request.mensaje,
+                ):
+                    yield f"data: {json.dumps(evento, ensure_ascii=False)}\n\n"
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                evento_error = {"tipo": "error", "mensaje": "Ocurrió un error al procesar tu mensaje."}
+                yield f"data: {json.dumps(evento_error, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(generar(), media_type="text/event-stream")
 
 
 @app.get("/sesiones/{session_id}/mensajes")
-def obtener_mensajes(session_id: str, pool=Depends(obtener_pool)):
+def obtener_mensajes(session_id: uuid.UUID, pool=Depends(obtener_pool)):
     with pool.connection() as conn:
-        return sessions.obtener_mensajes_visibles(conn, session_id)
+        return sessions.obtener_mensajes_visibles(conn, str(session_id))

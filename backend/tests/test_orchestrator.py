@@ -79,6 +79,20 @@ def test_procesar_turno_con_tool_call_arma_fuentes(db_conn, clean_db):
                     }
                 ],
             },
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_2",
+                        "type": "function",
+                        "function": {
+                            "name": "obtener_requisitos",
+                            "arguments": '{"tramite_id": "RC-0001"}',
+                        },
+                    }
+                ],
+            },
             {"role": "assistant", "content": "Necesitás tu DNI.", "tool_calls": None},
         ]
     )
@@ -102,6 +116,37 @@ def test_procesar_turno_con_tool_call_arma_fuentes(db_conn, clean_db):
             }
         ],
     }
+
+
+def test_procesar_turno_solo_busqueda_no_cita_fuentes(db_conn, clean_db):
+    _armar_tramite_de_prueba(db_conn)
+    session_id = str(uuid.uuid4())
+
+    chat_client = _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "buscar_tramite", "arguments": '{"query": "acta"}'},
+                    }
+                ],
+            },
+            {"role": "assistant", "content": "¿Cuál trámite te interesa?", "tool_calls": None},
+        ]
+    )
+
+    eventos = list(
+        procesar_turno(
+            db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "qué necesito para un acta"
+        )
+    )
+    db_conn.commit()
+
+    assert eventos[-1] == {"tipo": "fin", "fuentes": []}
 
 
 def test_procesar_turno_persiste_los_mensajes_visibles(db_conn, clean_db):

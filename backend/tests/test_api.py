@@ -68,6 +68,55 @@ def test_post_chat_devuelve_eventos_sse(db_conn, clean_db):
     assert "".join(e["delta"] for e in eventos if e["tipo"] == "texto").strip() == "Hola"
 
 
+def test_post_chat_tool_desconocida_emite_evento_error(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    api.app.dependency_overrides[obtener_chat_client] = lambda: _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "tool_inexistente", "arguments": "{}"},
+                    }
+                ],
+            }
+        ]
+    )
+    api.app.dependency_overrides[obtener_openai_client] = lambda: _FakeOpenAIClient()
+
+    client = TestClient(api.app)
+    try:
+        respuesta = client.post("/chat", json={"session_id": session_id, "mensaje": "hola"})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    lineas = [linea for linea in respuesta.text.split("\n\n") if linea.startswith("data: ")]
+    eventos = [json.loads(linea[len("data: ") :]) for linea in lineas]
+    assert eventos[-1]["tipo"] == "error"
+
+
+def test_post_chat_session_id_invalido_devuelve_422(db_conn, clean_db):
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    api.app.dependency_overrides[obtener_chat_client] = lambda: _FakeChatClient(
+        [{"role": "assistant", "content": "Hola", "tool_calls": None}]
+    )
+    api.app.dependency_overrides[obtener_openai_client] = lambda: _FakeOpenAIClient()
+
+    client = TestClient(api.app)
+    try:
+        respuesta = client.post("/chat", json={"session_id": "no-es-un-uuid", "mensaje": "hola"})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 422
+
+
 def test_get_mensajes_devuelve_historial_visible(db_conn, clean_db):
     session_id = str(uuid.uuid4())
     sessions.crear_sesion_si_no_existe(db_conn, session_id)

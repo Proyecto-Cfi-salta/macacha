@@ -37,7 +37,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
 
         if not respuesta["tool_calls"]:
             sessions.guardar_mensaje(conn, session_id, rol="assistant", contenido=respuesta["content"])
-            yield from _emitir_respuesta_trozeada(respuesta["content"])
+            yield from _emitir_respuesta_trozeada(respuesta["content"] or "")
             yield {"tipo": "fin", "fuentes": _armar_fuentes(conn, tramites_citados)}
             return
 
@@ -61,9 +61,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
             argumentos = json.loads(tool_call["function"]["arguments"])
             resultado = ejecutar_tool(nombre, argumentos, conn, embed_fn, rerank_fn)
 
-            if nombre == "buscar_tramite":
-                tramites_citados.update(candidato["tramite_id"] for candidato in resultado)
-            elif "tramite_id" in argumentos:
+            if "tramite_id" in argumentos:
                 tramites_citados.add(argumentos["tramite_id"])
 
             resultado_json = json.dumps(resultado, ensure_ascii=False)
@@ -81,7 +79,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
 
 
 def _emitir_respuesta_trozeada(texto: str):
-    for palabra in texto.split(" "):
+    for palabra in texto.split():
         yield {"tipo": "texto", "delta": palabra + " "}
 
 
