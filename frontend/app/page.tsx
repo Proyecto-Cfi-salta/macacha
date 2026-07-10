@@ -34,7 +34,7 @@ function Chat({ sessionId }: { sessionId: string }) {
             onReintentar={
               mensaje.error
                 ? () => {
-                    const anterior = mensajes[mensajes.length - 2];
+                    const anterior = mensajes[indice - 1];
                     if (anterior) enviarMensaje(anterior.contenido);
                   }
                 : undefined
