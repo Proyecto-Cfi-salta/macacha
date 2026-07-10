@@ -4,7 +4,7 @@ export type MensajeVisible = {
   creado_en: string;
 };
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export async function obtenerHistorial(
   sessionId: string

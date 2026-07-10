@@ -32,7 +32,7 @@ function Chat({ sessionId }: { sessionId: string }) {
             key={indice}
             mensaje={mensaje}
             onReintentar={
-              mensaje.error
+              mensaje.error && !enviando
                 ? () => {
                     const anterior = mensajes[indice - 1];
                     if (anterior) enviarMensaje(anterior.contenido);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { obtenerHistorial } from "../lib/api";
+import { BASE_URL, obtenerHistorial } from "../lib/api";
 
 export type Fuente = {
   tramite_id: string;
@@ -28,18 +28,18 @@ export function parsearLineasSSE(texto: string): EventoSSE[] {
     .map((linea) => JSON.parse(linea.slice("data: ".length)) as EventoSSE);
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
 export function useChatStream(sessionId: string) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
-    obtenerHistorial(sessionId).then((historial) => {
-      setMensajes(
-        historial.map((m) => ({ rol: m.rol, contenido: m.contenido }))
-      );
-    });
+    obtenerHistorial(sessionId)
+      .then((historial) => {
+        setMensajes(
+          historial.map((m) => ({ rol: m.rol, contenido: m.contenido }))
+        );
+      })
+      .catch(() => setMensajes([]));
   }, [sessionId]);
 
   function aplicarEvento(evento: EventoSSE) {
@@ -79,6 +79,15 @@ export function useChatStream(sessionId: string) {
         body: JSON.stringify({ session_id: sessionId, mensaje: texto }),
       });
 
+      if (!respuesta.ok) {
+        console.error("Respuesta no exitosa del backend:", respuesta.status);
+        aplicarEvento({
+          tipo: "error",
+          mensaje: "No se pudo conectar con el servidor. Intentá de nuevo.",
+        });
+        return;
+      }
+
       const lector = respuesta.body?.getReader();
       const decodificador = new TextDecoder();
       let acumulado = "";
@@ -99,7 +108,8 @@ export function useChatStream(sessionId: string) {
           }
         }
       }
-    } catch {
+    } catch (error) {
+      console.error("Error al enviar el mensaje:", error);
       aplicarEvento({
         tipo: "error",
         mensaje: "No se pudo conectar con el servidor. Intentá de nuevo.",
