@@ -135,3 +135,16 @@ def test_get_mensajes_devuelve_historial_visible(db_conn, clean_db):
     assert respuesta.status_code == 200
     cuerpo = respuesta.json()
     assert [m["rol"] for m in cuerpo] == ["user", "assistant"]
+
+
+def test_cors_preflight_allows_frontend_origin():
+    respuesta = TestClient(api.app).options(
+        "/chat",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.headers.get("access-control-allow-origin") == "http://localhost:3000"
