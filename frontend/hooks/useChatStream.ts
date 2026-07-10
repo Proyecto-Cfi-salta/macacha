@@ -72,34 +72,41 @@ export function useChatStream(sessionId: string) {
     ]);
     setEnviando(true);
 
-    const respuesta = await fetch(`${BASE_URL}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, mensaje: texto }),
-    });
+    try {
+      const respuesta = await fetch(`${BASE_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, mensaje: texto }),
+      });
 
-    const lector = respuesta.body?.getReader();
-    const decodificador = new TextDecoder();
-    let acumulado = "";
+      const lector = respuesta.body?.getReader();
+      const decodificador = new TextDecoder();
+      let acumulado = "";
 
-    if (lector) {
-      while (true) {
-        const { done, value } = await lector.read();
-        if (done) break;
-        acumulado += decodificador.decode(value, { stream: true });
+      if (lector) {
+        while (true) {
+          const { done, value } = await lector.read();
+          if (done) break;
+          acumulado += decodificador.decode(value, { stream: true });
 
-        const partes = acumulado.split("\n\n");
-        acumulado = partes.pop() ?? "";
+          const partes = acumulado.split("\n\n");
+          acumulado = partes.pop() ?? "";
 
-        if (partes.length > 0) {
-          for (const evento of parsearLineasSSE(partes.join("\n\n"))) {
-            aplicarEvento(evento);
+          if (partes.length > 0) {
+            for (const evento of parsearLineasSSE(partes.join("\n\n"))) {
+              aplicarEvento(evento);
+            }
           }
         }
       }
+    } catch {
+      aplicarEvento({
+        tipo: "error",
+        mensaje: "No se pudo conectar con el servidor. Intentá de nuevo.",
+      });
+    } finally {
+      setEnviando(false);
     }
-
-    setEnviando(false);
   }
 
   return { mensajes, enviando, enviarMensaje };
