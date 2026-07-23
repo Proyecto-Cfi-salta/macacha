@@ -32,6 +32,8 @@ def build_snapshot(raw_tramite: dict, faq_generator) -> dict:
         "costo": raw_tramite.get("costo", ""),
         "modalidad": raw_tramite.get("modalidad", ""),
         "duracion": raw_tramite.get("duracion", ""),
+        "telefono_contacto": raw_tramite.get("telefono_contacto", ""),
+        "email_contacto": raw_tramite.get("email_contacto", ""),
         "problemas_frecuentes": raw_tramite.get("problemas_frecuentes", []),
         "preguntas_frecuentes": preguntas_frecuentes,
         "enlaces_oficiales": enlaces_oficiales,

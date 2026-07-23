@@ -67,3 +67,20 @@ def test_generates_faqs_when_missing():
             "pasos": ["Ingresar a https://registrocivilsalta.gob.ar/"],
         }
     ]
+
+
+def test_includes_contact_fields_with_defaults_when_missing():
+    snapshot = build_snapshot(_raw_tramite(), _faq_generator_no_debe_llamarse)
+
+    assert snapshot["telefono_contacto"] == ""
+    assert snapshot["email_contacto"] == ""
+
+
+def test_includes_contact_fields_when_present():
+    raw = _raw_tramite(
+        telefono_contacto="0387-4234567", email_contacto="registrocivil@salta.gob.ar"
+    )
+    snapshot = build_snapshot(raw, _faq_generator_no_debe_llamarse)
+
+    assert snapshot["telefono_contacto"] == "0387-4234567"
+    assert snapshot["email_contacto"] == "registrocivil@salta.gob.ar"
