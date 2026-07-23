@@ -71,3 +71,17 @@ def test_obtener_snapshot_vigente_devuelve_el_snapshot(db_conn, clean_db):
     resultado = repo.obtener_snapshot_vigente(db_conn, "RC-0001")
 
     assert resultado == snapshot
+
+
+def test_incrementar_veces_consultado_suma_uno(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    db_conn.commit()
+
+    repo.incrementar_veces_consultado(db_conn, "RC-0001")
+    repo.incrementar_veces_consultado(db_conn, "RC-0001")
+    db_conn.commit()
+
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT veces_consultado FROM tramites WHERE id = %s", ("RC-0001",))
+        assert cur.fetchone()[0] == 2

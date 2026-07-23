@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS tramites (
     organismo_id INTEGER NOT NULL REFERENCES organismos(id),
     categoria TEXT NOT NULL,
     nombre_oficial TEXT NOT NULL,
+    veces_consultado INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -60,6 +61,8 @@ CREATE TABLE IF NOT EXISTS mensajes (
 );
 
 ALTER TABLE mensajes ADD COLUMN IF NOT EXISTS orden BIGSERIAL;
+
+ALTER TABLE tramites ADD COLUMN IF NOT EXISTS veces_consultado INTEGER NOT NULL DEFAULT 0;
 
 DROP INDEX IF EXISTS mensajes_session_idx;
 CREATE INDEX IF NOT EXISTS mensajes_session_orden_idx ON mensajes (session_id, orden);

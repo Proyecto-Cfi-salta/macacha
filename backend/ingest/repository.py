@@ -110,3 +110,11 @@ def obtener_snapshot_vigente(conn, tramite_id: str) -> dict | None:
         if row is None:
             return None
         return row[0]
+
+
+def incrementar_veces_consultado(conn, tramite_id: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE tramites SET veces_consultado = veces_consultado + 1 WHERE id = %s",
+            (tramite_id,),
+        )
