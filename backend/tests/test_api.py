@@ -205,3 +205,50 @@ def test_post_chat_incrementa_veces_consultado(db_conn, clean_db):
     with db_conn.cursor() as cur:
         cur.execute("SELECT veces_consultado FROM tramites WHERE id = %s", ("RC-0001",))
         assert cur.fetchone()[0] == 1
+
+
+def test_get_tramite_devuelve_detalle(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    snapshot = {
+        "id": "RC-0001",
+        "organismo": "Registro Civil",
+        "categoria": "Actas",
+        "nombre_oficial": "Actas Regulares",
+        "requisitos": ["DNI"],
+        "telefono_contacto": "0387-4234567",
+        "email_contacto": "registrocivil@salta.gob.ar",
+    }
+    chunks = [{"tipo_chunk": "descripcion", "texto": "texto", "fuente_url": None}]
+    embeddings = [[0.0] * 1536]
+    repo.insert_version_with_chunks(db_conn, "RC-0001", 1, "hash-1", snapshot, chunks, embeddings)
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        respuesta = client.get("/tramites/RC-0001")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == {
+        "tramite_id": "RC-0001",
+        "nombre_oficial": "Actas Regulares",
+        "organismo": "Registro Civil",
+        "categoria": "Actas",
+        "requisitos": ["DNI"],
+        "telefono_contacto": "0387-4234567",
+        "email_contacto": "registrocivil@salta.gob.ar",
+    }
+
+
+def test_get_tramite_inexistente_devuelve_404(db_conn, clean_db):
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        respuesta = client.get("/tramites/RC-9999")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 404
