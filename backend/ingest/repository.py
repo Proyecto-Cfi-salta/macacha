@@ -118,3 +118,22 @@ def incrementar_veces_consultado(conn, tramite_id: str) -> None:
             "UPDATE tramites SET veces_consultado = veces_consultado + 1 WHERE id = %s",
             (tramite_id,),
         )
+
+
+def obtener_tramites_frecuentes(conn, organismo: str, limite: int = 5) -> list[dict]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT t.id, t.nombre_oficial, t.veces_consultado
+            FROM tramites t
+            JOIN organismos o ON o.id = t.organismo_id
+            WHERE o.nombre = %s AND t.veces_consultado > 0
+            ORDER BY t.veces_consultado DESC, t.id ASC
+            LIMIT %s
+            """,
+            (organismo, limite),
+        )
+        return [
+            {"tramite_id": row[0], "nombre_oficial": row[1], "veces_consultado": row[2]}
+            for row in cur.fetchall()
+        ]

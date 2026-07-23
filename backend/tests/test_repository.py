@@ -85,3 +85,62 @@ def test_incrementar_veces_consultado_suma_uno(db_conn, clean_db):
     with db_conn.cursor() as cur:
         cur.execute("SELECT veces_consultado FROM tramites WHERE id = %s", ("RC-0001",))
         assert cur.fetchone()[0] == 2
+
+
+def test_obtener_tramites_frecuentes_ordena_por_veces_consultado(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    repo.upsert_tramite(db_conn, "RC-0002", organismo_id, "Actas", "Actas Especiales")
+    db_conn.commit()
+
+    repo.incrementar_veces_consultado(db_conn, "RC-0001")
+    repo.incrementar_veces_consultado(db_conn, "RC-0002")
+    repo.incrementar_veces_consultado(db_conn, "RC-0002")
+    db_conn.commit()
+
+    resultado = repo.obtener_tramites_frecuentes(db_conn, "Registro Civil")
+
+    assert resultado == [
+        {"tramite_id": "RC-0002", "nombre_oficial": "Actas Especiales", "veces_consultado": 2},
+        {"tramite_id": "RC-0001", "nombre_oficial": "Actas Regulares", "veces_consultado": 1},
+    ]
+
+
+def test_obtener_tramites_frecuentes_excluye_no_consultados(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    db_conn.commit()
+
+    assert repo.obtener_tramites_frecuentes(db_conn, "Registro Civil") == []
+
+
+def test_obtener_tramites_frecuentes_respeta_el_limite(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    for i in range(1, 8):
+        tramite_id = f"RC-000{i}"
+        repo.upsert_tramite(db_conn, tramite_id, organismo_id, "Actas", f"Trámite {i}")
+        db_conn.commit()
+        repo.incrementar_veces_consultado(db_conn, tramite_id)
+        db_conn.commit()
+
+    resultado = repo.obtener_tramites_frecuentes(db_conn, "Registro Civil")
+
+    assert len(resultado) == 5
+
+
+def test_obtener_tramites_frecuentes_no_mezcla_organismos(db_conn, clean_db):
+    rc_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    otro_id = repo.upsert_organismo(db_conn, "Rentas")
+    repo.upsert_tramite(db_conn, "RC-0001", rc_id, "Actas", "Actas Regulares")
+    repo.upsert_tramite(db_conn, "RE-0001", otro_id, "Impuestos", "Pago de Rentas")
+    db_conn.commit()
+
+    repo.incrementar_veces_consultado(db_conn, "RC-0001")
+    repo.incrementar_veces_consultado(db_conn, "RE-0001")
+    db_conn.commit()
+
+    resultado = repo.obtener_tramites_frecuentes(db_conn, "Registro Civil")
+
+    assert resultado == [
+        {"tramite_id": "RC-0001", "nombre_oficial": "Actas Regulares", "veces_consultado": 1}
+    ]
