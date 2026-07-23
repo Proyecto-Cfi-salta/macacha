@@ -4,6 +4,7 @@ import uuid
 from functools import lru_cache
 from typing import Iterator
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -14,6 +15,9 @@ from agent.chat_client import build_real_chat_client
 from agent.orchestrator import procesar_turno
 from db.pool import crear_pool
 from ingest.openai_client import build_real_client
+from ingest.repository import incrementar_veces_consultado
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -55,6 +59,7 @@ def chat(
     def generar() -> Iterator[str]:
         with pool.connection() as conn:
             try:
+                fuentes_del_turno: list[dict] = []
                 for evento in procesar_turno(
                     conn,
                     chat_client,
@@ -63,7 +68,11 @@ def chat(
                     str(request.session_id),
                     request.mensaje,
                 ):
+                    if evento["tipo"] == "fin":
+                        fuentes_del_turno = evento["fuentes"]
                     yield f"data: {json.dumps(evento, ensure_ascii=False)}\n\n"
+                for fuente in fuentes_del_turno:
+                    incrementar_veces_consultado(conn, fuente["tramite_id"])
                 conn.commit()
             except Exception:
                 conn.rollback()

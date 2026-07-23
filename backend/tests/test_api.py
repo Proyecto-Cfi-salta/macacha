@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from agent import api, sessions
 from agent.api import obtener_chat_client, obtener_openai_client, obtener_pool
+from ingest import repository as repo
 
 
 class _FakeConnCtx:
@@ -148,3 +149,59 @@ def test_cors_preflight_allows_frontend_origin():
 
     assert respuesta.status_code == 200
     assert respuesta.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_post_chat_incrementa_veces_consultado(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    snapshot = {
+        "id": "RC-0001",
+        "organismo": "Registro Civil",
+        "categoria": "Actas",
+        "nombre_oficial": "Actas Regulares",
+        "requisitos": ["DNI"],
+        "enlaces_oficiales": ["https://registrocivilsalta.gob.ar/"],
+        "telefono_contacto": "",
+        "email_contacto": "",
+    }
+    chunks = [{"tipo_chunk": "descripcion", "texto": "texto", "fuente_url": None}]
+    embeddings = [[0.0] * 1536]
+    repo.insert_version_with_chunks(db_conn, "RC-0001", 1, "hash-1", snapshot, chunks, embeddings)
+    db_conn.commit()
+
+    session_id = str(uuid.uuid4())
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    api.app.dependency_overrides[obtener_chat_client] = lambda: _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "obtener_requisitos",
+                            "arguments": '{"tramite_id": "RC-0001"}',
+                        },
+                    }
+                ],
+            },
+            {"role": "assistant", "content": "Necesitás tu DNI.", "tool_calls": None},
+        ]
+    )
+    api.app.dependency_overrides[obtener_openai_client] = lambda: _FakeOpenAIClient()
+
+    client = TestClient(api.app)
+    try:
+        respuesta = client.post(
+            "/chat", json={"session_id": session_id, "mensaje": "qué necesito para un acta"}
+        )
+        db_conn.commit()
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT veces_consultado FROM tramites WHERE id = %s", ("RC-0001",))
+        assert cur.fetchone()[0] == 1
