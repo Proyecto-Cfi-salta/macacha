@@ -1,4 +1,5 @@
 import json
+import urllib.parse
 import uuid
 
 from fastapi.testclient import TestClient
@@ -252,3 +253,46 @@ def test_get_tramite_inexistente_devuelve_404(db_conn, clean_db):
         api.app.dependency_overrides.clear()
 
     assert respuesta.status_code == 404
+
+
+def test_get_tramites_frecuentes_devuelve_ranking(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    repo.upsert_tramite(db_conn, "RC-0002", organismo_id, "Actas", "Actas Especiales")
+    db_conn.commit()
+    repo.incrementar_veces_consultado(db_conn, "RC-0002")
+    repo.incrementar_veces_consultado(db_conn, "RC-0002")
+    repo.incrementar_veces_consultado(db_conn, "RC-0001")
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        respuesta = client.get(
+            f"/organismos/{urllib.parse.quote('Registro Civil')}/tramites-frecuentes"
+        )
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == [
+        {"tramite_id": "RC-0002", "nombre_oficial": "Actas Especiales", "veces_consultado": 2},
+        {"tramite_id": "RC-0001", "nombre_oficial": "Actas Regulares", "veces_consultado": 1},
+    ]
+
+
+def test_get_tramites_frecuentes_organismo_sin_consultas_devuelve_lista_vacia(db_conn, clean_db):
+    repo.upsert_organismo(db_conn, "Registro Civil")
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        respuesta = client.get(
+            f"/organismos/{urllib.parse.quote('Registro Civil')}/tramites-frecuentes"
+        )
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == []

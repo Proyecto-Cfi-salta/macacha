@@ -15,7 +15,11 @@ from agent.chat_client import build_real_chat_client
 from agent.orchestrator import procesar_turno
 from db.pool import crear_pool
 from ingest.openai_client import build_real_client
-from ingest.repository import incrementar_veces_consultado, obtener_snapshot_vigente
+from ingest.repository import (
+    incrementar_veces_consultado,
+    obtener_snapshot_vigente,
+    obtener_tramites_frecuentes,
+)
 
 load_dotenv()
 
@@ -103,3 +107,9 @@ def obtener_tramite(tramite_id: str, pool=Depends(obtener_pool)):
             "telefono_contacto": snapshot.get("telefono_contacto", ""),
             "email_contacto": snapshot.get("email_contacto", ""),
         }
+
+
+@app.get("/organismos/{organismo}/tramites-frecuentes")
+def tramites_frecuentes(organismo: str, pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        return obtener_tramites_frecuentes(conn, organismo)
