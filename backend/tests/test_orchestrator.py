@@ -24,12 +24,12 @@ class _FakeChatClient:
         return respuesta
 
 
-def _armar_tramite_de_prueba(conn):
+def _armar_tramite_de_prueba(conn, tramite_id="RC-0001", nombre_oficial="Actas Regulares"):
     organismo_id = repo.upsert_organismo(conn, "Registro Civil")
-    repo.upsert_tramite(conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    repo.upsert_tramite(conn, tramite_id, organismo_id, "Actas", nombre_oficial)
     snapshot = {
-        "id": "RC-0001",
-        "nombre_oficial": "Actas Regulares",
+        "id": tramite_id,
+        "nombre_oficial": nombre_oficial,
         "requisitos": ["DNI"],
         "costo": "$6000",
         "modalidad": "Online",
@@ -40,9 +40,9 @@ def _armar_tramite_de_prueba(conn):
         "enlaces_oficiales": ["https://registrocivilsalta.gob.ar/"],
         "problemas_frecuentes": [],
     }
-    chunks = [{"tipo_chunk": "descripcion", "texto": "Actas Regulares", "fuente_url": "https://x"}]
+    chunks = [{"tipo_chunk": "descripcion", "texto": nombre_oficial, "fuente_url": "https://x"}]
     embeddings = [[0.0] * 1536]
-    repo.insert_version_with_chunks(conn, "RC-0001", 1, "hash-1", snapshot, chunks, embeddings)
+    repo.insert_version_with_chunks(conn, tramite_id, 1, f"hash-{tramite_id}", snapshot, chunks, embeddings)
     conn.commit()
 
 
@@ -116,6 +116,60 @@ def test_procesar_turno_con_tool_call_arma_fuentes(db_conn, clean_db):
             }
         ],
     }
+
+
+def test_procesar_turno_con_dos_tramites_preserva_orden_de_citacion(db_conn, clean_db):
+    _armar_tramite_de_prueba(db_conn, tramite_id="RC-0002", nombre_oficial="Acta de Matrimonio")
+    _armar_tramite_de_prueba(db_conn, tramite_id="RC-0001", nombre_oficial="Acta de Nacimiento")
+    session_id = str(uuid.uuid4())
+
+    chat_client = _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "obtener_requisitos",
+                            "arguments": '{"tramite_id": "RC-0002"}',
+                        },
+                    },
+                    {
+                        "id": "call_2",
+                        "type": "function",
+                        "function": {
+                            "name": "obtener_requisitos",
+                            "arguments": '{"tramite_id": "RC-0001"}',
+                        },
+                    },
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": "Te cuento las diferencias entre ambas actas.",
+                "tool_calls": None,
+            },
+        ]
+    )
+
+    eventos = list(
+        procesar_turno(
+            db_conn,
+            chat_client,
+            _fake_embed_fn,
+            _fake_rerank_fn,
+            session_id,
+            "diferencia entre acta de nacimiento y acta de matrimonio",
+        )
+    )
+    db_conn.commit()
+
+    fuentes = eventos[-1]["fuentes"]
+    ids_en_orden = [f["tramite_id"] for f in fuentes]
+    assert ids_en_orden == ["RC-0002", "RC-0001"]
 
 
 def test_procesar_turno_solo_busqueda_no_cita_fuentes(db_conn, clean_db):

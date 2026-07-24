@@ -30,7 +30,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
         + [{"role": "user", "content": mensaje_usuario}]
     )
 
-    tramites_citados: set[str] = set()
+    tramites_citados: list[str] = []
 
     for _ in range(MAX_ITERACIONES_TOOLS):
         respuesta = chat_client.completar(messages=messages, tools=TOOL_SCHEMAS)
@@ -61,8 +61,8 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
             argumentos = json.loads(tool_call["function"]["arguments"])
             resultado = ejecutar_tool(nombre, argumentos, conn, embed_fn, rerank_fn)
 
-            if "tramite_id" in argumentos:
-                tramites_citados.add(argumentos["tramite_id"])
+            if "tramite_id" in argumentos and argumentos["tramite_id"] not in tramites_citados:
+                tramites_citados.append(argumentos["tramite_id"])
 
             resultado_json = json.dumps(resultado, ensure_ascii=False)
             sessions.guardar_mensaje(
@@ -83,9 +83,9 @@ def _emitir_respuesta_trozeada(texto: str):
         yield {"tipo": "texto", "delta": palabra + " "}
 
 
-def _armar_fuentes(conn, tramites_citados: set[str]) -> list[dict]:
+def _armar_fuentes(conn, tramites_citados: list[str]) -> list[dict]:
     fuentes = []
-    for tramite_id in sorted(tramites_citados):
+    for tramite_id in tramites_citados:
         snapshot = obtener_snapshot_vigente(conn, tramite_id)
         if snapshot is None:
             continue
