@@ -1,9 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
+import { TramiteInfoPanel } from "../components/TramiteInfoPanel";
+import { TramitesFrecuentesPanel } from "../components/TramitesFrecuentesPanel";
 import { useChatStream } from "../hooks/useChatStream";
 import { useSession } from "../hooks/useSession";
+import { useTramiteActual } from "../hooks/useTramiteActual";
+import { useTramitesFrecuentes } from "../hooks/useTramitesFrecuentes";
 
 export default function Home() {
   const { sessionId } = useSession();
@@ -15,35 +20,93 @@ export default function Home() {
   return <Chat sessionId={sessionId} />;
 }
 
+type Tab = "chat" | "info" | "frecuentes";
+
 function Chat({ sessionId }: { sessionId: string }) {
   const { mensajes, enviando, enviarMensaje } = useChatStream(sessionId);
+  const { tramite } = useTramiteActual(mensajes);
+  const { tramites: tramitesFrecuentes } = useTramitesFrecuentes(tramite?.organismo);
+  const [tab, setTab] = useState<Tab>("chat");
 
   return (
-    <main className="mx-auto flex h-screen max-w-2xl flex-col">
-      <header className="border-b border-gray-200 p-4">
-        <h1 className="text-lg font-semibold">Macacha</h1>
-        <p className="text-sm text-gray-500">
-          Asistente de trámites — Provincia de Salta
-        </p>
-      </header>
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {mensajes.map((mensaje, indice) => (
-          <ChatMessage
-            key={indice}
-            mensaje={mensaje}
-            onReintentar={
-              mensaje.error && !enviando
-                ? () => {
-                    const anterior = mensajes[indice - 1];
-                    if (anterior) enviarMensaje(anterior.contenido);
-                  }
-                : undefined
-            }
-          />
-        ))}
-        {enviando && <p className="text-sm text-gray-400">escribiendo…</p>}
-      </div>
-      <ChatInput disabled={enviando} onEnviar={enviarMensaje} />
-    </main>
+    <div className="mx-auto flex h-screen max-w-6xl flex-col md:flex-row">
+      <nav className="flex border-b border-gray-200 md:hidden">
+        <TabButton activo={tab === "chat"} onClick={() => setTab("chat")}>
+          Chat
+        </TabButton>
+        <TabButton activo={tab === "info"} onClick={() => setTab("info")}>
+          Info del trámite
+        </TabButton>
+        <TabButton activo={tab === "frecuentes"} onClick={() => setTab("frecuentes")}>
+          Más consultados
+        </TabButton>
+      </nav>
+
+      <aside
+        className={`w-full overflow-y-auto border-gray-200 p-4 md:block md:w-64 md:border-r ${
+          tab === "frecuentes" ? "block" : "hidden"
+        }`}
+      >
+        <TramitesFrecuentesPanel tramites={tramitesFrecuentes} />
+      </aside>
+
+      <main
+        className={`min-w-0 flex-1 flex-col ${tab === "chat" ? "flex" : "hidden"} md:flex`}
+      >
+        <header className="border-b border-gray-200 p-4">
+          <h1 className="text-lg font-semibold">Macacha</h1>
+          <p className="text-sm text-gray-500">
+            Asistente de trámites — Provincia de Salta
+          </p>
+        </header>
+        <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          {mensajes.map((mensaje, indice) => (
+            <ChatMessage
+              key={indice}
+              mensaje={mensaje}
+              onReintentar={
+                mensaje.error && !enviando
+                  ? () => {
+                      const anterior = mensajes[indice - 1];
+                      if (anterior) enviarMensaje(anterior.contenido);
+                    }
+                  : undefined
+              }
+            />
+          ))}
+          {enviando && <p className="text-sm text-gray-400">escribiendo…</p>}
+        </div>
+        <ChatInput disabled={enviando} onEnviar={enviarMensaje} />
+      </main>
+
+      <aside
+        className={`w-full overflow-y-auto border-gray-200 p-4 md:block md:w-72 md:border-l ${
+          tab === "info" ? "block" : "hidden"
+        }`}
+      >
+        <TramiteInfoPanel tramite={tramite} />
+      </aside>
+    </div>
+  );
+}
+
+function TabButton({
+  activo,
+  onClick,
+  children,
+}: {
+  activo: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      className={`flex-1 p-3 text-sm font-medium ${
+        activo ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"
+      }`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
