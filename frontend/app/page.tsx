@@ -43,7 +43,7 @@ function Chat({ sessionId }: { sessionId: string }) {
       </nav>
 
       <aside
-        className={`w-full overflow-y-auto border-gray-200 p-4 md:block md:w-64 md:border-r ${
+        className={`w-full flex-1 overflow-y-auto border-gray-200 p-4 md:block md:w-64 md:border-r ${
           tab === "frecuentes" ? "block" : "hidden"
         }`}
       >
@@ -80,7 +80,7 @@ function Chat({ sessionId }: { sessionId: string }) {
       </main>
 
       <aside
-        className={`w-full overflow-y-auto border-gray-200 p-4 md:block md:w-72 md:border-l ${
+        className={`w-full flex-1 overflow-y-auto border-gray-200 p-4 md:block md:w-72 md:border-l ${
           tab === "info" ? "block" : "hidden"
         }`}
       >
