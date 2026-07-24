@@ -20,15 +20,33 @@ export function useTramiteActual(mensajes: Mensaje[]) {
   const tramiteId = obtenerUltimoTramiteId(mensajes);
 
   useEffect(() => {
+    let cancelado = false;
+
     if (!tramiteId) {
       setTramite(null);
       return;
     }
     setCargando(true);
     obtenerTramite(tramiteId)
-      .then(setTramite)
-      .catch(() => setTramite(null))
-      .finally(() => setCargando(false));
+      .then((resultado) => {
+        if (!cancelado) {
+          setTramite(resultado);
+        }
+      })
+      .catch(() => {
+        if (!cancelado) {
+          setTramite(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelado) {
+          setCargando(false);
+        }
+      });
+
+    return () => {
+      cancelado = true;
+    };
   }, [tramiteId]);
 
   return { tramite, cargando };
