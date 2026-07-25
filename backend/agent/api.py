@@ -5,12 +5,15 @@ from functools import lru_cache
 from typing import Iterator
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agent import sessions
+from agent.admin import repository as admin_repository
+from agent.admin import security as admin_security
+from agent.admin.dependencies import requiere_admin
 from agent.chat_client import build_real_chat_client
 from agent.orchestrator import procesar_turno
 from db.pool import crear_pool
@@ -28,6 +31,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -113,3 +117,44 @@ def obtener_tramite(tramite_id: str, pool=Depends(obtener_pool)):
 def tramites_frecuentes(organismo: str, pool=Depends(obtener_pool)):
     with pool.connection() as conn:
         return obtener_tramites_frecuentes(conn, organismo)
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/admin/login")
+def admin_login(request: LoginRequest, response: Response, pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        admin = admin_repository.obtener_admin_por_email(conn, request.email)
+
+    if admin is None or not admin_security.verify_password(request.password, admin["password_hash"]):
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+    token = admin_security.crear_token(admin["id"])
+    response.set_cookie(
+        "admin_session",
+        token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=86400,
+    )
+    return {"email": admin["email"]}
+
+
+@app.post("/admin/logout")
+def admin_logout(response: Response):
+    response.delete_cookie("admin_session")
+    return {"ok": True}
+
+
+@app.get("/admin/me")
+def admin_me(admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        admin = admin_repository.obtener_admin_por_id(conn, admin_id)
+
+    if admin is None:
+        raise HTTPException(status_code=401, detail="No autenticado")
+    return {"email": admin["email"]}
