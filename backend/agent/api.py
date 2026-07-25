@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agent import sessions
+from agent.admin import chats_repository as admin_chats_repository
 from agent.admin import repository as admin_repository
 from agent.admin import security as admin_security
 from agent.admin.dependencies import requiere_admin
@@ -158,3 +159,28 @@ def admin_me(admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)
     if admin is None:
         raise HTTPException(status_code=401, detail="No autenticado")
     return {"email": admin["email"]}
+
+
+@app.get("/admin/sesiones")
+def admin_listar_sesiones(
+    page: int = 1,
+    page_size: int = 20,
+    admin_id: str = Depends(requiere_admin),
+    pool=Depends(obtener_pool),
+):
+    with pool.connection() as conn:
+        sesiones = admin_chats_repository.listar_sesiones(conn, page, page_size)
+        total = admin_chats_repository.contar_sesiones(conn)
+    return {"sesiones": sesiones, "total": total, "page": page, "page_size": page_size}
+
+
+@app.get("/admin/sesiones/{session_id}")
+def admin_obtener_sesion(
+    session_id: uuid.UUID,
+    admin_id: str = Depends(requiere_admin),
+    pool=Depends(obtener_pool),
+):
+    with pool.connection() as conn:
+        if not admin_chats_repository.sesion_existe(conn, str(session_id)):
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+        return admin_chats_repository.obtener_mensajes_completos(conn, str(session_id))
