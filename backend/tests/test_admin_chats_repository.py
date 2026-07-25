@@ -121,6 +121,34 @@ def test_listar_sesiones_extrae_tramites_citados_deduplicados_en_orden(db_conn, 
     assert sesiones[0]["tramites_citados"] == ["RC-0002", "RC-0001"]
 
 
+def test_listar_sesiones_ignora_tool_call_con_argumentos_invalidos(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    _crear_sesion(db_conn, session_id, datetime.now(timezone.utc))
+    sessions.guardar_mensaje(
+        db_conn,
+        session_id,
+        rol="assistant",
+        contenido=None,
+        tool_calls=[
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "obtener_requisitos", "arguments": "esto no es json valido"},
+            },
+            {
+                "id": "call_2",
+                "type": "function",
+                "function": {"name": "obtener_pasos", "arguments": '{"tramite_id": "RC-0001"}'},
+            },
+        ],
+    )
+    db_conn.commit()
+
+    sesiones = chats_repository.listar_sesiones(db_conn, page=1, page_size=20)
+
+    assert sesiones[0]["tramites_citados"] == ["RC-0001"]
+
+
 def test_sesion_existe(db_conn, clean_db):
     session_id = str(uuid.uuid4())
     _crear_sesion(db_conn, session_id, datetime.now(timezone.utc))

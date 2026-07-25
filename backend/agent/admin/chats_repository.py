@@ -21,13 +21,21 @@ def listar_sesiones(conn, page: int, page_size: int) -> list[dict]:
         )
         filas = cur.fetchall()
 
+    if not filas:
+        return []
+
+    session_ids = [str(sesion_id) for sesion_id, _ in filas]
+    conteos = _contar_mensajes_visibles_batch(conn, session_ids)
+    ultimos = _obtener_ultimo_mensaje_batch(conn, session_ids)
+    citados = _extraer_tramites_citados_batch(conn, session_ids)
+
     return [
         {
             "id": str(sesion_id),
             "creado_en": creado_en.isoformat(),
-            "cantidad_mensajes": _contar_mensajes_visibles(conn, sesion_id),
-            "ultimo_mensaje": _obtener_ultimo_mensaje(conn, sesion_id),
-            "tramites_citados": _extraer_tramites_citados(conn, sesion_id),
+            "cantidad_mensajes": conteos.get(str(sesion_id), 0),
+            "ultimo_mensaje": ultimos.get(str(sesion_id)),
+            "tramites_citados": citados.get(str(sesion_id), []),
         }
         for sesion_id, creado_en in filas
     ]
@@ -63,33 +71,32 @@ def obtener_mensajes_completos(conn, session_id: str) -> list[dict]:
     return mensajes
 
 
-def _contar_mensajes_visibles(conn, session_id) -> int:
+def _contar_mensajes_visibles_batch(conn, session_ids: list[str]) -> dict[str, int]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT COUNT(*) FROM mensajes
-            WHERE session_id = %s AND rol IN ('user', 'assistant') AND contenido IS NOT NULL
+            SELECT session_id, COUNT(*)
+            FROM mensajes
+            WHERE session_id = ANY(%s) AND rol IN ('user', 'assistant') AND contenido IS NOT NULL
+            GROUP BY session_id
             """,
-            (session_id,),
+            (session_ids,),
         )
-        return cur.fetchone()[0]
+        return {str(session_id): total for session_id, total in cur.fetchall()}
 
 
-def _obtener_ultimo_mensaje(conn, session_id) -> str | None:
+def _obtener_ultimo_mensaje_batch(conn, session_ids: list[str]) -> dict[str, str]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT contenido FROM mensajes
-            WHERE session_id = %s AND rol IN ('user', 'assistant') AND contenido IS NOT NULL
-            ORDER BY orden DESC
-            LIMIT 1
+            SELECT DISTINCT ON (session_id) session_id, contenido
+            FROM mensajes
+            WHERE session_id = ANY(%s) AND rol IN ('user', 'assistant') AND contenido IS NOT NULL
+            ORDER BY session_id, orden DESC
             """,
-            (session_id,),
+            (session_ids,),
         )
-        fila = cur.fetchone()
-        if fila is None:
-            return None
-        return _truncar(fila[0], 140)
+        return {str(session_id): _truncar(contenido, 140) for session_id, contenido in cur.fetchall()}
 
 
 def _truncar(texto: str, longitud: int) -> str:
@@ -98,23 +105,29 @@ def _truncar(texto: str, longitud: int) -> str:
     return texto[:longitud] + "…"
 
 
-def _extraer_tramites_citados(conn, session_id) -> list[str]:
+def _extraer_tramites_citados_batch(conn, session_ids: list[str]) -> dict[str, list[str]]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT tool_calls FROM mensajes
-            WHERE session_id = %s AND rol = 'assistant' AND tool_calls IS NOT NULL
-            ORDER BY orden ASC
+            SELECT session_id, tool_calls
+            FROM mensajes
+            WHERE session_id = ANY(%s) AND rol = 'assistant' AND tool_calls IS NOT NULL
+            ORDER BY session_id, orden ASC
             """,
-            (session_id,),
+            (session_ids,),
         )
         filas = cur.fetchall()
 
-    citados: list[str] = []
-    for (tool_calls,) in filas:
+    citados_por_sesion: dict[str, list[str]] = {}
+    for session_id, tool_calls in filas:
+        sid = str(session_id)
+        citados = citados_por_sesion.setdefault(sid, [])
         for tool_call in tool_calls:
-            argumentos = json.loads(tool_call["function"]["arguments"])
+            try:
+                argumentos = json.loads(tool_call["function"]["arguments"])
+            except (KeyError, TypeError, json.JSONDecodeError):
+                continue
             tramite_id = argumentos.get("tramite_id")
             if tramite_id and tramite_id not in citados:
                 citados.append(tramite_id)
-    return citados
+    return citados_por_sesion

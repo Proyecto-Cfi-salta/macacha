@@ -27,6 +27,11 @@ from ingest.repository import (
 
 load_dotenv()
 
+if not os.environ.get("ADMIN_JWT_SECRET"):
+    raise RuntimeError(
+        "Falta la variable de entorno ADMIN_JWT_SECRET. Ver .env.example."
+    )
+
 app = FastAPI()
 
 app.add_middleware(
