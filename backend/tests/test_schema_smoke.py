@@ -18,4 +18,5 @@ def test_extension_and_tables_exist(db_conn):
             "tramite_chunks",
             "sesiones",
             "mensajes",
+            "admins",
         } <= tables
