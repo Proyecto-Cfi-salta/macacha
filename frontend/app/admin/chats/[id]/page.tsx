@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { obtenerSesion, type MensajeAdmin } from "../../../../lib/admin-api";
 import { extraerDetalleToolCalls } from "../../../../lib/admin-chats";
+import { BurbujaMensaje } from "../../../../components/BurbujaMensaje";
 
 export default function SesionDetallePage() {
   const params = useParams<{ id: string }>();
@@ -57,18 +58,12 @@ export default function SesionDetallePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-3 p-4">
       {visibles.map((mensaje, indice) => (
-        <div key={indice} className={`flex ${mensaje.rol === "user" ? "justify-end" : "justify-start"}`}>
-          <div
-            className={`max-w-[80%] rounded-lg px-4 py-2 ${
-              mensaje.rol === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
-            }`}
-          >
-            <p className="whitespace-pre-wrap">{mensaje.contenido}</p>
-            {mensaje.rol === "assistant" && mensaje.tool_calls && mensaje.tool_calls.length > 0 && (
-              <DetalleTecnico mensaje={mensaje} todosLosMensajes={mensajes} />
-            )}
-          </div>
-        </div>
+        <BurbujaMensaje key={indice} esUsuario={mensaje.rol === "user"}>
+          <p className="whitespace-pre-wrap">{mensaje.contenido}</p>
+          {mensaje.rol === "assistant" && mensaje.tool_calls && mensaje.tool_calls.length > 0 && (
+            <DetalleTecnico mensaje={mensaje} todosLosMensajes={mensajes} />
+          )}
+        </BurbujaMensaje>
       ))}
     </div>
   );

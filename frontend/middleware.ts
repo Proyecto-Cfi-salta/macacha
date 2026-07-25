@@ -7,15 +7,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const respuesta = await fetch(`${BASE_URL}/admin/me`, {
-    headers: { cookie: request.headers.get("cookie") ?? "" },
-  });
+  try {
+    const respuesta = await fetch(`${BASE_URL}/admin/me`, {
+      headers: { cookie: request.headers.get("cookie") ?? "" },
+    });
 
-  if (!respuesta.ok) {
+    if (!respuesta.ok) {
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+
+    return NextResponse.next();
+  } catch {
     return NextResponse.redirect(new URL("/admin/login", request.url));
   }
-
-  return NextResponse.next();
 }
 
 export const config = {
