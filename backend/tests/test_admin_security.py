@@ -1,0 +1,46 @@
+from datetime import datetime, timedelta, timezone
+
+import jwt
+
+from agent.admin import security
+
+
+def test_hash_password_permite_verificar_la_password_correcta():
+    hash_ = security.hash_password("secreta123")
+    assert security.verify_password("secreta123", hash_) is True
+
+
+def test_verify_password_rechaza_password_incorrecta():
+    hash_ = security.hash_password("secreta123")
+    assert security.verify_password("otra-cosa", hash_) is False
+
+
+def test_crear_token_y_decodificar_token_devuelve_admin_id(monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    token = security.crear_token("admin-1")
+    assert security.decodificar_token(token) == "admin-1"
+
+
+def test_decodificar_token_invalido_devuelve_none(monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    assert security.decodificar_token("token-basura") is None
+
+
+def test_decodificar_token_expirado_devuelve_none(monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    token_vencido = jwt.encode(
+        {"sub": "admin-1", "exp": datetime.now(timezone.utc) - timedelta(hours=1)},
+        "secreto-de-test",
+        algorithm="HS256",
+    )
+    assert security.decodificar_token(token_vencido) is None
+
+
+def test_decodificar_token_firmado_con_otro_secreto_devuelve_none(monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    token_ajeno = jwt.encode(
+        {"sub": "admin-1", "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+        "otro-secreto",
+        algorithm="HS256",
+    )
+    assert security.decodificar_token(token_ajeno) is None
