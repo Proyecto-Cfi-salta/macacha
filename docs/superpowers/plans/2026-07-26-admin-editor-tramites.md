@@ -271,6 +271,7 @@ def test_editar_tramite_con_cambios_crea_version_nueva(db_conn, clean_db):
     payload["costo"] = "Con costo"
 
     resultado = tramite_editor.editar_tramite(db_conn, "RC-0001", payload, _fake_embed)
+    db_conn.commit()
 
     assert resultado == {"tramite_id": "RC-0001", "numero_version": 2, "cambios": True}
     vigente = repo.get_vigente_version(db_conn, "RC-0001")
@@ -283,6 +284,7 @@ def test_editar_tramite_preserva_chunks_narrativos_con_su_embedding(db_conn, cle
     payload["costo"] = "Con costo"
 
     tramite_editor.editar_tramite(db_conn, "RC-0001", payload, _fake_embed)
+    db_conn.commit()
 
     vigente = repo.get_vigente_version(db_conn, "RC-0001")
     chunks = tramites_repository.obtener_chunks_por_version(db_conn, vigente["id"])
@@ -297,6 +299,7 @@ def test_editar_tramite_regenera_chunks_de_faq_y_enlaces(db_conn, clean_db):
     payload["preguntas_frecuentes"] = [{"pregunta": "nueva", "respuesta": "resp nueva"}]
 
     tramite_editor.editar_tramite(db_conn, "RC-0001", payload, _fake_embed)
+    db_conn.commit()
 
     vigente = repo.get_vigente_version(db_conn, "RC-0001")
     chunks = tramites_repository.obtener_chunks_por_version(db_conn, vigente["id"])
@@ -313,6 +316,7 @@ def test_editar_tramite_actualiza_organismo_categoria_y_nombre(db_conn, clean_db
     payload["nombre_oficial"] = "Nuevo Nombre"
 
     tramite_editor.editar_tramite(db_conn, "RC-0001", payload, _fake_embed)
+    db_conn.commit()
 
     tramites = tramites_repository.listar_tramites(db_conn)
     assert tramites[0]["organismo"] == "Dirección de Rentas"
@@ -498,6 +502,7 @@ def test_crear_tramite_inserta_version_uno_con_chunk_de_descripcion(db_conn, cle
     payload["descripcion"] = "Descripción del trámite"
 
     resultado = tramite_editor.crear_tramite(db_conn, payload, _fake_embed)
+    db_conn.commit()
 
     assert resultado == {"tramite_id": resultado["tramite_id"], "numero_version": 1, "cambios": True}
     assert resultado["tramite_id"].startswith("RC-")
@@ -512,6 +517,7 @@ def test_crear_tramite_sin_descripcion_usa_solo_el_nombre(db_conn, clean_db):
     payload = _payload_minimo()
 
     resultado = tramite_editor.crear_tramite(db_conn, payload, _fake_embed)
+    db_conn.commit()
 
     vigente = repo.get_vigente_version(db_conn, resultado["tramite_id"])
     chunks = tramites_repository.obtener_chunks_por_version(db_conn, vigente["id"])
@@ -523,6 +529,7 @@ def test_crear_tramite_incluye_chunks_de_faq_si_hay(db_conn, clean_db):
     payload["preguntas_frecuentes"] = [{"pregunta": "p", "respuesta": "r"}]
 
     resultado = tramite_editor.crear_tramite(db_conn, payload, _fake_embed)
+    db_conn.commit()
 
     vigente = repo.get_vigente_version(db_conn, resultado["tramite_id"])
     chunks = tramites_repository.obtener_chunks_por_version(db_conn, vigente["id"])
