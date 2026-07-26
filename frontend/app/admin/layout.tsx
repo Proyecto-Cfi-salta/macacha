@@ -23,6 +23,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 Chats
               </Link>
             </li>
+            <li>
+              <Link href="/admin/tramites" className="text-blue-700 hover:underline">
+                Trámites
+              </Link>
+            </li>
           </ul>
         </div>
         <button onClick={handleLogout} className="text-left text-sm text-gray-500 hover:underline">
