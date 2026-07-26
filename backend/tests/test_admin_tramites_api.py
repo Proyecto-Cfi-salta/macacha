@@ -322,3 +322,67 @@ def test_editar_tramite_falla_de_embeddings_no_escribe_nada(db_conn, clean_db, m
     assert respuesta.status_code == 502
     vigente = repo.get_vigente_version(db_conn, "RC-0001")
     assert vigente["numero_version"] == 1
+
+
+def test_crear_tramite_requiere_autenticacion(db_conn, clean_db):
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        respuesta = client.post("/admin/tramites", json={"organismo": "x", "nombre_oficial": "y"})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 401
+
+
+def test_crear_tramite_payload_invalido_devuelve_422(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.post(
+            "/admin/tramites", json={"organismo": "Registro Civil", "nombre_oficial": ""}
+        )
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 422
+
+
+def test_crear_tramite_exitoso_genera_id_y_version_uno(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    payload = {
+        "organismo": "Registro Civil",
+        "categoria": "Actas",
+        "nombre_oficial": "Trámite Nuevo",
+        "descripcion": "Descripción",
+        "objetivo": "",
+        "requisitos": [],
+        "pasos": [],
+        "costo": "",
+        "modalidad": "",
+        "duracion": "",
+        "telefono_contacto": "",
+        "email_contacto": "",
+        "problemas_frecuentes": [],
+        "sinonimos": [],
+        "keywords": [],
+        "enlaces_oficiales": [],
+        "preguntas_frecuentes": [],
+    }
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    api.app.dependency_overrides[api.obtener_openai_client] = lambda: _FakeOpenAIClient()
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.post("/admin/tramites", json=payload)
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert cuerpo["tramite_id"].startswith("RC-")
+    assert cuerpo["numero_version"] == 1

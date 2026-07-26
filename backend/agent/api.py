@@ -282,3 +282,25 @@ def admin_editar_tramite(
                 detail="No se pudieron generar los embeddings. Verificá la configuración de OpenAI.",
             )
     return resultado
+
+
+@app.post("/admin/tramites")
+def admin_crear_tramite(
+    request: TramitePayload,
+    admin_id: str = Depends(requiere_admin),
+    pool=Depends(obtener_pool),
+    openai_client=Depends(obtener_openai_client),
+):
+    with pool.connection() as conn:
+        try:
+            resultado = admin_tramite_editor.crear_tramite(
+                conn, request.model_dump(), openai_client.generate_embeddings
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise HTTPException(
+                status_code=502,
+                detail="No se pudieron generar los embeddings. Verificá la configuración de OpenAI.",
+            )
+    return resultado
