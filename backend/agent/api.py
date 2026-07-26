@@ -14,6 +14,7 @@ from agent import sessions
 from agent.admin import chats_repository as admin_chats_repository
 from agent.admin import repository as admin_repository
 from agent.admin import security as admin_security
+from agent.admin import tramites_repository as admin_tramites_repository
 from agent.admin.dependencies import requiere_admin
 from agent.chat_client import build_real_chat_client
 from agent.orchestrator import procesar_turno
@@ -189,3 +190,44 @@ def admin_obtener_sesion(
         if not admin_chats_repository.sesion_existe(conn, str(session_id)):
             raise HTTPException(status_code=404, detail="Sesión no encontrada")
         return admin_chats_repository.obtener_mensajes_completos(conn, str(session_id))
+
+
+@app.get("/admin/tramites")
+def admin_listar_tramites(admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        return admin_tramites_repository.listar_tramites(conn)
+
+
+@app.get("/admin/organismos")
+def admin_listar_organismos(admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        return admin_tramites_repository.listar_organismos(conn)
+
+
+@app.get("/admin/tramites/{tramite_id}")
+def admin_obtener_tramite(
+    tramite_id: str, admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)
+):
+    with pool.connection() as conn:
+        snapshot = obtener_snapshot_vigente(conn, tramite_id)
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail="Trámite no encontrado")
+        return {
+            "organismo": snapshot["organismo"],
+            "categoria": snapshot["categoria"],
+            "nombre_oficial": snapshot["nombre_oficial"],
+            "descripcion": snapshot.get("descripcion", ""),
+            "objetivo": snapshot.get("objetivo", ""),
+            "requisitos": snapshot.get("requisitos", []),
+            "pasos": snapshot.get("pasos", []),
+            "costo": snapshot.get("costo", ""),
+            "modalidad": snapshot.get("modalidad", ""),
+            "duracion": snapshot.get("duracion", ""),
+            "telefono_contacto": snapshot.get("telefono_contacto", ""),
+            "email_contacto": snapshot.get("email_contacto", ""),
+            "problemas_frecuentes": snapshot.get("problemas_frecuentes", []),
+            "sinonimos": snapshot.get("sinonimos", []),
+            "keywords": snapshot.get("keywords", []),
+            "enlaces_oficiales": snapshot.get("enlaces_oficiales", []),
+            "preguntas_frecuentes": snapshot.get("preguntas_frecuentes", []),
+        }
