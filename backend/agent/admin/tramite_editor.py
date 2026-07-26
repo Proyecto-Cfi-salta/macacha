@@ -84,3 +84,74 @@ def editar_tramite(conn, tramite_id: str, payload: dict, embed_fn) -> dict:
     upsert_tramite(conn, tramite_id, organismo_id, snapshot["categoria"], snapshot["nombre_oficial"])
 
     return {"tramite_id": tramite_id, "numero_version": numero_version, "cambios": True}
+
+
+def generar_id_tramite(conn, organismo: str) -> str:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT t.id
+            FROM tramites t
+            JOIN organismos o ON o.id = t.organismo_id
+            WHERE o.nombre = %s
+            ORDER BY t.id
+            LIMIT 1
+            """,
+            (organismo,),
+        )
+        fila = cur.fetchone()
+
+    if fila is not None:
+        prefijo = fila[0].split("-")[0]
+    else:
+        prefijo = _resolver_colision_prefijo(conn, _iniciales(organismo))
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM tramites WHERE id LIKE %s ORDER BY id DESC LIMIT 1",
+            (f"{prefijo}-%",),
+        )
+        ultimo = cur.fetchone()
+
+    siguiente_numero = 1 if ultimo is None else int(ultimo[0].split("-")[1]) + 1
+    return f"{prefijo}-{siguiente_numero:04d}"
+
+
+def _iniciales(organismo: str) -> str:
+    conectores = {"de", "del", "la", "los", "las", "y"}
+    palabras = [p for p in organismo.split() if p.lower() not in conectores]
+    if not palabras:
+        return organismo[:2].upper()
+    return "".join(p[0].upper() for p in palabras)
+
+
+def _resolver_colision_prefijo(conn, prefijo: str) -> str:
+    with conn.cursor() as cur:
+        for sufijo in [""] + [str(n) for n in range(2, 10)]:
+            candidato = f"{prefijo}{sufijo}"
+            cur.execute("SELECT 1 FROM tramites WHERE id LIKE %s LIMIT 1", (f"{candidato}-%",))
+            if cur.fetchone() is None:
+                return candidato
+    raise RuntimeError(f"No se pudo generar un prefijo único a partir de '{prefijo}'")
+
+
+def crear_tramite(conn, payload: dict, embed_fn) -> dict:
+    organismo_id = upsert_organismo(conn, payload["organismo"])
+    tramite_id = generar_id_tramite(conn, payload["organismo"])
+    upsert_tramite(conn, tramite_id, organismo_id, payload.get("categoria", ""), payload["nombre_oficial"])
+
+    snapshot = _construir_snapshot(tramite_id, payload)
+    content_hash = compute_content_hash(snapshot)
+
+    descripcion_texto = snapshot["nombre_oficial"]
+    if snapshot["descripcion"]:
+        descripcion_texto = f"{snapshot['nombre_oficial']}. {snapshot['descripcion']}"
+
+    chunks = [{"tipo_chunk": "descripcion", "texto": descripcion_texto, "fuente_url": None}]
+    chunks.extend(_construir_chunks_faq_y_enlaces(snapshot))
+
+    embeddings = embed_fn([c["texto"] for c in chunks])
+
+    insert_version_with_chunks(conn, tramite_id, 1, content_hash, snapshot, chunks, embeddings)
+
+    return {"tramite_id": tramite_id, "numero_version": 1, "cambios": True}

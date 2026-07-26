@@ -128,3 +128,89 @@ def test_editar_tramite_actualiza_organismo_categoria_y_nombre(db_conn, clean_db
     assert tramites[0]["organismo"] == "Dirección de Rentas"
     assert tramites[0]["categoria"] == "Impuestos"
     assert tramites[0]["nombre_oficial"] == "Nuevo Nombre"
+
+
+def _payload_minimo(organismo="Registro Civil", categoria="Actas", nombre="Nuevo Trámite"):
+    return {
+        "organismo": organismo,
+        "categoria": categoria,
+        "nombre_oficial": nombre,
+        "descripcion": "",
+        "objetivo": "",
+        "requisitos": [],
+        "pasos": [],
+        "costo": "",
+        "modalidad": "",
+        "duracion": "",
+        "telefono_contacto": "",
+        "email_contacto": "",
+        "problemas_frecuentes": [],
+        "sinonimos": [],
+        "keywords": [],
+        "enlaces_oficiales": [],
+        "preguntas_frecuentes": [],
+    }
+
+
+def test_generar_id_tramite_reutiliza_prefijo_de_organismo_existente(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0032", organismo_id, "Actas", "Trámite existente")
+    db_conn.commit()
+
+    assert tramite_editor.generar_id_tramite(db_conn, "Registro Civil") == "RC-0033"
+
+
+def test_generar_id_tramite_deriva_prefijo_de_iniciales_para_organismo_nuevo(db_conn, clean_db):
+    repo.upsert_organismo(db_conn, "Dirección de Rentas")
+    db_conn.commit()
+
+    assert tramite_editor.generar_id_tramite(db_conn, "Dirección de Rentas") == "DR-0001"
+
+
+def test_generar_id_tramite_resuelve_colision_de_prefijo(db_conn, clean_db):
+    organismo_dr_id = repo.upsert_organismo(db_conn, "Departamento de Recursos")
+    repo.upsert_tramite(db_conn, "DR-0001", organismo_dr_id, "Cat", "Trámite del primero")
+    repo.upsert_organismo(db_conn, "Dirección de Rentas")
+    db_conn.commit()
+
+    assert tramite_editor.generar_id_tramite(db_conn, "Dirección de Rentas") == "DR2-0001"
+
+
+def test_crear_tramite_inserta_version_uno_con_chunk_de_descripcion(db_conn, clean_db):
+    payload = _payload_minimo()
+    payload["descripcion"] = "Descripción del trámite"
+
+    resultado = tramite_editor.crear_tramite(db_conn, payload, _fake_embed)
+    db_conn.commit()
+
+    assert resultado == {"tramite_id": resultado["tramite_id"], "numero_version": 1, "cambios": True}
+    assert resultado["tramite_id"].startswith("RC-")
+
+    vigente = repo.get_vigente_version(db_conn, resultado["tramite_id"])
+    chunks = tramites_repository.obtener_chunks_por_version(db_conn, vigente["id"])
+    assert chunks[0]["tipo_chunk"] == "descripcion"
+    assert chunks[0]["texto"] == "Nuevo Trámite. Descripción del trámite"
+
+
+def test_crear_tramite_sin_descripcion_usa_solo_el_nombre(db_conn, clean_db):
+    payload = _payload_minimo()
+
+    resultado = tramite_editor.crear_tramite(db_conn, payload, _fake_embed)
+    db_conn.commit()
+
+    vigente = repo.get_vigente_version(db_conn, resultado["tramite_id"])
+    chunks = tramites_repository.obtener_chunks_por_version(db_conn, vigente["id"])
+    assert chunks[0]["texto"] == "Nuevo Trámite"
+
+
+def test_crear_tramite_incluye_chunks_de_faq_si_hay(db_conn, clean_db):
+    payload = _payload_minimo()
+    payload["preguntas_frecuentes"] = [{"pregunta": "p", "respuesta": "r"}]
+
+    resultado = tramite_editor.crear_tramite(db_conn, payload, _fake_embed)
+    db_conn.commit()
+
+    vigente = repo.get_vigente_version(db_conn, resultado["tramite_id"])
+    chunks = tramites_repository.obtener_chunks_por_version(db_conn, vigente["id"])
+    tipos = {c["tipo_chunk"] for c in chunks}
+    assert "faq" in tipos
