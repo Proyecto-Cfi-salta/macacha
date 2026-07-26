@@ -8,12 +8,13 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agent import sessions
 from agent.admin import chats_repository as admin_chats_repository
 from agent.admin import repository as admin_repository
 from agent.admin import security as admin_security
+from agent.admin import tramite_editor as admin_tramite_editor
 from agent.admin import tramites_repository as admin_tramites_repository
 from agent.admin.dependencies import requiere_admin
 from agent.chat_client import build_real_chat_client
@@ -231,3 +232,53 @@ def admin_obtener_tramite(
             "enlaces_oficiales": snapshot.get("enlaces_oficiales", []),
             "preguntas_frecuentes": snapshot.get("preguntas_frecuentes", []),
         }
+
+
+class FaqPayload(BaseModel):
+    pregunta: str
+    respuesta: str
+
+
+class TramitePayload(BaseModel):
+    organismo: str = Field(min_length=1)
+    categoria: str = ""
+    nombre_oficial: str = Field(min_length=1)
+    descripcion: str = ""
+    objetivo: str = ""
+    requisitos: list[str] = []
+    pasos: list[str] = []
+    costo: str = ""
+    modalidad: str = ""
+    duracion: str = ""
+    telefono_contacto: str = ""
+    email_contacto: str = ""
+    problemas_frecuentes: list[str] = []
+    sinonimos: list[str] = []
+    keywords: list[str] = []
+    enlaces_oficiales: list[str] = []
+    preguntas_frecuentes: list[FaqPayload] = []
+
+
+@app.put("/admin/tramites/{tramite_id}")
+def admin_editar_tramite(
+    tramite_id: str,
+    request: TramitePayload,
+    admin_id: str = Depends(requiere_admin),
+    pool=Depends(obtener_pool),
+    openai_client=Depends(obtener_openai_client),
+):
+    with pool.connection() as conn:
+        if obtener_snapshot_vigente(conn, tramite_id) is None:
+            raise HTTPException(status_code=404, detail="Trámite no encontrado")
+        try:
+            resultado = admin_tramite_editor.editar_tramite(
+                conn, tramite_id, request.model_dump(), openai_client.generate_embeddings
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise HTTPException(
+                status_code=502,
+                detail="No se pudieron generar los embeddings. Verificá la configuración de OpenAI.",
+            )
+    return resultado
