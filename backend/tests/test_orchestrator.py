@@ -213,3 +213,20 @@ def test_procesar_turno_persiste_los_mensajes_visibles(db_conn, clean_db):
     visibles = sessions.obtener_mensajes_visibles(db_conn, session_id)
     assert [m["rol"] for m in visibles] == ["user", "assistant"]
     assert [m["contenido"] for m in visibles] == ["hola", "Hola"]
+
+
+def test_procesar_turno_persiste_el_proveedor_del_chat_client(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    chat_client = _FakeChatClient(
+        [{"role": "assistant", "content": "Hola", "tool_calls": None, "proveedor": "gemini"}]
+    )
+
+    list(procesar_turno(db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "hola"))
+    db_conn.commit()
+
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT proveedor FROM mensajes WHERE session_id = %s AND rol = 'assistant'",
+            (session_id,),
+        )
+        assert cur.fetchone()[0] == "gemini"

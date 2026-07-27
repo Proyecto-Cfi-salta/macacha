@@ -36,7 +36,13 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
         respuesta = chat_client.completar(messages=messages, tools=TOOL_SCHEMAS)
 
         if not respuesta["tool_calls"]:
-            sessions.guardar_mensaje(conn, session_id, rol="assistant", contenido=respuesta["content"])
+            sessions.guardar_mensaje(
+                conn,
+                session_id,
+                rol="assistant",
+                contenido=respuesta["content"],
+                proveedor=respuesta.get("proveedor"),
+            )
             yield from _emitir_respuesta_trozeada(respuesta["content"] or "")
             yield {"tipo": "fin", "fuentes": _armar_fuentes(conn, tramites_citados)}
             return
@@ -47,6 +53,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
             rol="assistant",
             contenido=respuesta["content"],
             tool_calls=respuesta["tool_calls"],
+            proveedor=respuesta.get("proveedor"),
         )
         messages.append(
             {
