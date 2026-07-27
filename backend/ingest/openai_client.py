@@ -1,12 +1,15 @@
 import json
+import os
 
 
 class OpenAIClient:
     EMBEDDING_MODEL = "text-embedding-3-small"
-    FAQ_MODEL = "gpt-4o-mini"
+    FAQ_MODEL_OPENAI = "gpt-4o-mini"
+    FAQ_MODEL_GEMINI = "gemini-2.0-flash"
 
-    def __init__(self, sdk_client):
+    def __init__(self, sdk_client, sdk_client_gemini=None):
         self._sdk_client = sdk_client
+        self._sdk_client_gemini = sdk_client_gemini
 
     def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         response = self._sdk_client.embeddings.create(
@@ -31,12 +34,8 @@ class OpenAIClient:
             'Respondé únicamente con JSON con esta forma: '
             '{"faqs": [{"pregunta": "...", "respuesta": "..."}]}'
         )
-        response = self._sdk_client.chat.completions.create(
-            model=self.FAQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
-        data = json.loads(response.choices[0].message.content)
+        content = self._completar_con_fallback(prompt)
+        data = json.loads(content)
         return data["faqs"]
 
     def rerank(self, query: str, candidatos: list[dict]) -> list[int]:
@@ -51,16 +50,36 @@ class OpenAIClient:
             'Respondé únicamente con JSON con esta forma: '
             '{"orden": [<índices originales, del más al menos relevante>]}'
         )
-        response = self._sdk_client.chat.completions.create(
-            model=self.FAQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
-        data = json.loads(response.choices[0].message.content)
+        content = self._completar_con_fallback(prompt)
+        data = json.loads(content)
         return data["orden"]
+
+    def _completar_con_fallback(self, prompt: str) -> str:
+        try:
+            response = self._sdk_client.chat.completions.create(
+                model=self.FAQ_MODEL_OPENAI,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
+        except Exception:
+            if self._sdk_client_gemini is None:
+                raise
+            print("OpenAI falló, usando fallback a Gemini")
+            response = self._sdk_client_gemini.chat.completions.create(
+                model=self.FAQ_MODEL_GEMINI,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
+        return response.choices[0].message.content
 
 
 def build_real_client() -> OpenAIClient:
     from openai import OpenAI
 
-    return OpenAIClient(OpenAI())
+    sdk_client_gemini = None
+    if os.environ.get("GEMINI_API_KEY"):
+        sdk_client_gemini = OpenAI(
+            api_key=os.environ["GEMINI_API_KEY"],
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        )
+    return OpenAIClient(OpenAI(), sdk_client_gemini)

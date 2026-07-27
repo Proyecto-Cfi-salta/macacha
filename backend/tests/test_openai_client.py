@@ -39,12 +39,15 @@ class _FakeChatCompletionResponse:
 
 
 class _FakeCompletions:
-    def __init__(self, content):
+    def __init__(self, content=None, error=None):
         self._content = content
+        self._error = error
         self.last_call = None
 
     def create(self, model, messages, response_format):
         self.last_call = {"model": model, "messages": messages, "response_format": response_format}
+        if self._error is not None:
+            raise self._error
         return _FakeChatCompletionResponse(self._content)
 
 
@@ -54,13 +57,13 @@ class _FakeChat:
 
 
 class _FakeOpenAISDK:
-    def __init__(self, vectors, faq_json_content):
-        self.embeddings = _FakeEmbeddings(vectors)
-        self.chat = _FakeChat(_FakeCompletions(faq_json_content))
+    def __init__(self, vectors=None, content=None, error=None):
+        self.embeddings = _FakeEmbeddings(vectors or [])
+        self.chat = _FakeChat(_FakeCompletions(content=content, error=error))
 
 
 def test_generate_embeddings_calls_api_and_returns_vectors():
-    fake_sdk = _FakeOpenAISDK(vectors=[[0.1, 0.2], [0.3, 0.4]], faq_json_content="{}")
+    fake_sdk = _FakeOpenAISDK(vectors=[[0.1, 0.2], [0.3, 0.4]], content="{}")
     client = OpenAIClient(fake_sdk)
 
     resultado = client.generate_embeddings(["texto 1", "texto 2"])
@@ -81,7 +84,7 @@ def test_generate_faqs_parses_json_response():
             ]
         }
     )
-    fake_sdk = _FakeOpenAISDK(vectors=[], faq_json_content=faq_json)
+    fake_sdk = _FakeOpenAISDK(content=faq_json)
     client = OpenAIClient(fake_sdk)
 
     resultado = client.generate_faqs(
@@ -100,7 +103,7 @@ def test_generate_faqs_parses_json_response():
 
 def test_rerank_parses_json_response_as_order():
     orden_json = json.dumps({"orden": [2, 0, 1]})
-    fake_sdk = _FakeOpenAISDK(vectors=[], faq_json_content=orden_json)
+    fake_sdk = _FakeOpenAISDK(content=orden_json)
     client = OpenAIClient(fake_sdk)
 
     candidatos = [
@@ -113,3 +116,40 @@ def test_rerank_parses_json_response_as_order():
 
     assert resultado == [2, 0, 1]
     assert fake_sdk.chat.completions.last_call["model"] == "gpt-4o-mini"
+
+
+def test_generate_faqs_usa_gemini_si_openai_falla():
+    faq_json = json.dumps({"faqs": [{"pregunta": "p", "respuesta": "r"}]})
+    fake_openai = _FakeOpenAISDK(error=RuntimeError("401 de OpenAI"))
+    fake_gemini = _FakeOpenAISDK(content=faq_json)
+    client = OpenAIClient(fake_openai, fake_gemini)
+
+    resultado = client.generate_faqs(
+        nombre_oficial="Actas Regulares", descripcion="desc", requisitos=["DNI"], pasos=["Paso 1"]
+    )
+
+    assert resultado == [{"pregunta": "p", "respuesta": "r"}]
+    assert fake_gemini.chat.completions.last_call["model"] == "gemini-2.0-flash"
+
+
+def test_rerank_usa_gemini_si_openai_falla():
+    orden_json = json.dumps({"orden": [1, 0]})
+    fake_openai = _FakeOpenAISDK(error=RuntimeError("401 de OpenAI"))
+    fake_gemini = _FakeOpenAISDK(content=orden_json)
+    client = OpenAIClient(fake_openai, fake_gemini)
+
+    resultado = client.rerank("query", [{"texto": "a"}, {"texto": "b"}])
+
+    assert resultado == [1, 0]
+    assert fake_gemini.chat.completions.last_call["model"] == "gemini-2.0-flash"
+
+
+def test_rerank_sin_cliente_gemini_propaga_error_de_openai():
+    fake_openai = _FakeOpenAISDK(error=ValueError("401 de OpenAI"))
+    client = OpenAIClient(fake_openai)
+
+    try:
+        client.rerank("query", [{"texto": "a"}])
+        assert False, "debería haber propagado la excepción"
+    except ValueError as exc:
+        assert str(exc) == "401 de OpenAI"
