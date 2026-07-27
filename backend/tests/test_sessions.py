@@ -72,3 +72,27 @@ def test_obtener_mensajes_visibles_excluye_tool_calling_interno(db_conn, clean_d
 
     assert [m["rol"] for m in visibles] == ["user", "assistant"]
     assert [m["contenido"] for m in visibles] == ["hola", "respuesta final"]
+
+
+def test_guardar_mensaje_persiste_proveedor(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    sessions.crear_sesion_si_no_existe(db_conn, session_id)
+
+    sessions.guardar_mensaje(db_conn, session_id, rol="assistant", contenido="hola", proveedor="gemini")
+    db_conn.commit()
+
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT proveedor FROM mensajes WHERE session_id = %s", (session_id,))
+        assert cur.fetchone()[0] == "gemini"
+
+
+def test_guardar_mensaje_sin_proveedor_persiste_null(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    sessions.crear_sesion_si_no_existe(db_conn, session_id)
+
+    sessions.guardar_mensaje(db_conn, session_id, rol="user", contenido="hola")
+    db_conn.commit()
+
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT proveedor FROM mensajes WHERE session_id = %s", (session_id,))
+        assert cur.fetchone()[0] is None

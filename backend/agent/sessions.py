@@ -16,12 +16,13 @@ def guardar_mensaje(
     contenido: str | None = None,
     tool_calls: list[dict] | None = None,
     tool_call_id: str | None = None,
+    proveedor: str | None = None,
 ) -> None:
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO mensajes (session_id, rol, contenido, tool_calls, tool_call_id)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO mensajes (session_id, rol, contenido, tool_calls, tool_call_id, proveedor)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
                 session_id,
@@ -29,6 +30,7 @@ def guardar_mensaje(
                 contenido,
                 json.dumps(tool_calls) if tool_calls is not None else None,
                 tool_call_id,
+                proveedor,
             ),
         )
 

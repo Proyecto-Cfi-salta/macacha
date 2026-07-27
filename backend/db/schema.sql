@@ -67,6 +67,8 @@ ALTER TABLE tramites ADD COLUMN IF NOT EXISTS veces_consultado INTEGER NOT NULL 
 DROP INDEX IF EXISTS mensajes_session_idx;
 CREATE INDEX IF NOT EXISTS mensajes_session_orden_idx ON mensajes (session_id, orden);
 
+ALTER TABLE mensajes ADD COLUMN IF NOT EXISTS proveedor TEXT;
+
 CREATE TABLE IF NOT EXISTS admins (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
