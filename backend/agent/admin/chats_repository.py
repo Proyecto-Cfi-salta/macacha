@@ -51,7 +51,7 @@ def obtener_mensajes_completos(conn, session_id: str) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT rol, contenido, tool_calls, tool_call_id, created_at
+            SELECT rol, contenido, tool_calls, tool_call_id, proveedor, created_at
             FROM mensajes
             WHERE session_id = %s
             ORDER BY orden ASC
@@ -61,12 +61,14 @@ def obtener_mensajes_completos(conn, session_id: str) -> list[dict]:
         filas = cur.fetchall()
 
     mensajes = []
-    for rol, contenido, tool_calls, tool_call_id, creado_en in filas:
+    for rol, contenido, tool_calls, tool_call_id, proveedor, creado_en in filas:
         mensaje: dict = {"rol": rol, "contenido": contenido, "creado_en": creado_en.isoformat()}
         if tool_calls is not None:
             mensaje["tool_calls"] = tool_calls
         if tool_call_id is not None:
             mensaje["tool_call_id"] = tool_call_id
+        if proveedor is not None:
+            mensaje["proveedor"] = proveedor
         mensajes.append(mensaje)
     return mensajes
 

@@ -186,3 +186,18 @@ def test_obtener_mensajes_completos_incluye_tool_calls_y_mensajes_tool(db_conn, 
     assert [m["rol"] for m in mensajes] == ["user", "assistant", "tool", "assistant"]
     assert mensajes[1]["tool_calls"][0]["function"]["name"] == "obtener_requisitos"
     assert mensajes[2]["tool_call_id"] == "call_1"
+
+
+def test_obtener_mensajes_completos_incluye_proveedor_cuando_no_es_null(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    _crear_sesion(db_conn, session_id, datetime.now(timezone.utc))
+    sessions.guardar_mensaje(db_conn, session_id, rol="user", contenido="hola")
+    sessions.guardar_mensaje(
+        db_conn, session_id, rol="assistant", contenido="respuesta", proveedor="gemini"
+    )
+    db_conn.commit()
+
+    mensajes = chats_repository.obtener_mensajes_completos(db_conn, session_id)
+
+    assert "proveedor" not in mensajes[0]
+    assert mensajes[1]["proveedor"] == "gemini"
