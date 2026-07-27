@@ -60,6 +60,11 @@ export default function SesionDetallePage() {
       {visibles.map((mensaje, indice) => (
         <BurbujaMensaje key={indice} esUsuario={mensaje.rol === "user"}>
           <p className="whitespace-pre-wrap">{mensaje.contenido}</p>
+          {mensaje.rol === "assistant" && mensaje.proveedor && (
+            <span className="mt-1 inline-block rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600">
+              {mensaje.proveedor === "gemini" ? "Gemini" : "OpenAI"}
+            </span>
+          )}
           {mensaje.rol === "assistant" && mensaje.tool_calls && mensaje.tool_calls.length > 0 && (
             <DetalleTecnico mensaje={mensaje} todosLosMensajes={mensajes} />
           )}

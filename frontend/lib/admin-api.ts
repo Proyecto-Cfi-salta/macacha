@@ -9,6 +9,7 @@ export type MensajeAdmin = {
   contenido: string | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
+  proveedor?: string;
   creado_en: string;
 };
 
