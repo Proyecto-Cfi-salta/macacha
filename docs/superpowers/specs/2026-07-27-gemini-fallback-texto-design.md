@@ -152,6 +152,26 @@ botón "Ver detalle técnico" existente.
   TABLE` contra el Postgres ya corriendo (o recrear el volumen) para que
   aplique — no es automático sobre un contenedor ya inicializado, mismo
   caso que la tabla `admins` en el plan anterior.
+- **El fallback NO cubre los turnos que disparan búsqueda.** Como
+  `generate_embeddings` queda fuera de alcance (ver arriba) y no tiene
+  fallback, cualquier turno donde el modelo llame a la tool
+  `buscar_tramite` sigue dependiendo enteramente de que `OPENAI_API_KEY`
+  funcione — si OpenAI está caído, ese turno falla igual aunque Gemini esté
+  configurado y funcionando, porque `embed_fn` explota antes de llegar a
+  usar el resultado. El fallback cubre las respuestas conversacionales
+  puras (sin tool call) y las que solo llaman a tools de lookup directo por
+  `tramite_id` ya conocido (no pasan por embeddings), más rerank y FAQs.
+  Es decir: cubre una parte real pero acotada del tráfico — no un caso
+  "el agente sigue funcionando entero ante una caída de OpenAI".
+- **Los mensajes del ciudadano se envían a un segundo proveedor externo
+  (Google) cuando se dispara el fallback.** Es una decisión consciente,
+  aceptada para el alcance actual de este proyecto, pero vale dejarla
+  documentada: mientras el fallback esté activo y se dispare, el contenido
+  de la conversación (que puede incluir detalles personales del trámite que
+  la persona está consultando) sale de la infraestructura de OpenAI y pasa
+  por la API de Google Generative Language. No hay opt-out por sesión ni
+  aviso al usuario final — es invisible salvo para un admin mirando el
+  badge en `/admin/chats`.
 
 ## Criterios de aceptación
 
@@ -159,9 +179,13 @@ botón "Ver detalle técnico" existente.
   es idéntico al actual (sin cambios de UI, sin cambios de respuesta ante
   una falla de OpenAI).
 - Con `GEMINI_API_KEY` seteada y `OPENAI_API_KEY` inválida (como está hoy
-  en este entorno), el chat público sigue respondiendo — la respuesta viene
-  de Gemini.
-- En el panel de admin, esa sesión muestra el badge "Gemini" junto a la
-  respuesta que usó el fallback.
+  en este entorno), **un turno conversacional que no dispare `buscar_tramite`**
+  (saludo, pregunta general, o una tool de lookup directo con
+  `tramite_id` ya conocido) sigue respondiendo — la respuesta viene de
+  Gemini. Un turno que sí dispare `buscar_tramite` sigue fallando igual que
+  hoy, porque `generate_embeddings` no tiene fallback (ver "Comportamiento
+  explícito no obvio").
+- En el panel de admin, la sesión del turno que usó el fallback muestra el
+  badge "Gemini" junto a esa respuesta.
 - Con ambas keys inválidas, el chat público muestra el mismo mensaje de
   error genérico que ya muestra hoy ante una falla de OpenAI.
