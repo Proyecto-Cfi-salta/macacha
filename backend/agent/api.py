@@ -116,6 +116,11 @@ def obtener_tramite(tramite_id: str, pool=Depends(obtener_pool)):
             "organismo": snapshot["organismo"],
             "categoria": snapshot["categoria"],
             "requisitos": snapshot.get("requisitos", []),
+            "costo": snapshot.get("costo", ""),
+            "modalidad": snapshot.get("modalidad", ""),
+            "duracion": snapshot.get("duracion", ""),
+            "pasos": snapshot.get("pasos", []),
+            "enlaces_oficiales": snapshot.get("enlaces_oficiales", []),
             "telefono_contacto": snapshot.get("telefono_contacto", ""),
             "email_contacto": snapshot.get("email_contacto", ""),
         }

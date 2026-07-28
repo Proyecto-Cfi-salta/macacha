@@ -217,6 +217,11 @@ def test_get_tramite_devuelve_detalle(db_conn, clean_db):
         "categoria": "Actas",
         "nombre_oficial": "Actas Regulares",
         "requisitos": ["DNI"],
+        "costo": "Gratuito",
+        "modalidad": "Online",
+        "duracion": "10 días",
+        "pasos": ["Paso 1", "Paso 2"],
+        "enlaces_oficiales": ["https://registrocivilsalta.gob.ar/"],
         "telefono_contacto": "0387-4234567",
         "email_contacto": "registrocivil@salta.gob.ar",
     }
@@ -239,9 +244,45 @@ def test_get_tramite_devuelve_detalle(db_conn, clean_db):
         "organismo": "Registro Civil",
         "categoria": "Actas",
         "requisitos": ["DNI"],
+        "costo": "Gratuito",
+        "modalidad": "Online",
+        "duracion": "10 días",
+        "pasos": ["Paso 1", "Paso 2"],
+        "enlaces_oficiales": ["https://registrocivilsalta.gob.ar/"],
         "telefono_contacto": "0387-4234567",
         "email_contacto": "registrocivil@salta.gob.ar",
     }
+
+
+def test_get_tramite_sin_campos_opcionales_devuelve_defaults(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    snapshot = {
+        "id": "RC-0001",
+        "organismo": "Registro Civil",
+        "categoria": "Actas",
+        "nombre_oficial": "Actas Regulares",
+    }
+    chunks = [{"tipo_chunk": "descripcion", "texto": "texto", "fuente_url": None}]
+    embeddings = [[0.0] * 1536]
+    repo.insert_version_with_chunks(db_conn, "RC-0001", 1, "hash-1", snapshot, chunks, embeddings)
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        respuesta = client.get("/tramites/RC-0001")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert cuerpo["requisitos"] == []
+    assert cuerpo["costo"] == ""
+    assert cuerpo["modalidad"] == ""
+    assert cuerpo["duracion"] == ""
+    assert cuerpo["pasos"] == []
+    assert cuerpo["enlaces_oficiales"] == []
 
 
 def test_get_tramite_inexistente_devuelve_404(db_conn, clean_db):
