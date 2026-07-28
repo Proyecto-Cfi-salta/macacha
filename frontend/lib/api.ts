@@ -10,6 +10,11 @@ export type TramiteDetalle = {
   organismo: string;
   categoria: string;
   requisitos: string[];
+  costo: string;
+  modalidad: string;
+  duracion: string;
+  pasos: string[];
+  enlaces_oficiales: string[];
   telefono_contacto: string;
   email_contacto: string;
 };
