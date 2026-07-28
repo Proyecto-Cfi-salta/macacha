@@ -36,6 +36,30 @@ def test_buscar_chunks_aplica_el_orden_de_rerank_fn_y_recorta_a_top_k(db_conn, c
     assert len(resultados) == 2
 
 
+def test_buscar_chunks_ignora_indices_fuera_de_rango_del_rerank_fn(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+
+    chunks = [
+        {"tipo_chunk": "descripcion", "texto": "chunk sobre actas uno", "fuente_url": None},
+        {"tipo_chunk": "descripcion", "texto": "chunk sobre actas dos", "fuente_url": None},
+    ]
+    embeddings = [[0.0] * 1536, [0.0] * 1536]
+    repo.insert_version_with_chunks(
+        db_conn, "RC-0001", 1, "hash-1", {"id": "RC-0001"}, chunks, embeddings
+    )
+    db_conn.commit()
+
+    def rerank_fn_con_indices_invalidos(query, candidatos):
+        return [5, 0, -1, 1]
+
+    resultados = buscar_chunks(
+        "actas", db_conn, _fake_embed_fn, rerank_fn_con_indices_invalidos, top_k=5
+    )
+
+    assert len(resultados) == 2
+
+
 def test_buscar_chunks_usa_embed_fn_para_la_query(db_conn, clean_db):
     organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
     repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")

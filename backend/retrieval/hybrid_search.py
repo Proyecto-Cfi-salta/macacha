@@ -11,6 +11,6 @@ def buscar_chunks(query: str, conn, embed_fn, rerank_fn, top_k: int = 5) -> list
     fusionados = fusionar_rrf(ranking_vectorial, ranking_textual)
 
     orden = rerank_fn(query, fusionados)
-    reordenados = [fusionados[i] for i in orden]
+    reordenados = [fusionados[i] for i in orden if 0 <= i < len(fusionados)]
 
     return reordenados[:top_k]
