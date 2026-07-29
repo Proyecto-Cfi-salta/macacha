@@ -9,37 +9,47 @@ class ChatClient:
         self._sdk_client = sdk_client
         self._sdk_client_gemini = sdk_client_gemini
 
-    def completar(self, messages: list[dict], tools: list[dict]) -> dict:
+    def completar_streaming(self, messages: list[dict], tools: list[dict]):
         try:
-            response = self._sdk_client.chat.completions.create(
-                model=self.MODEL_OPENAI, messages=messages, tools=tools
+            stream = self._sdk_client.chat.completions.create(
+                model=self.MODEL_OPENAI, messages=messages, tools=tools, stream=True
             )
             proveedor = "openai"
         except Exception:
             if self._sdk_client_gemini is None:
                 raise
             print("OpenAI falló, usando fallback a Gemini")
-            response = self._sdk_client_gemini.chat.completions.create(
-                model=self.MODEL_GEMINI, messages=messages, tools=tools
+            stream = self._sdk_client_gemini.chat.completions.create(
+                model=self.MODEL_GEMINI, messages=messages, tools=tools, stream=True
             )
             proveedor = "gemini"
 
-        mensaje = response.choices[0].message
+        contenido_acumulado = ""
+        tool_calls_acumulados: dict[int, dict] = {}
 
-        tool_calls = None
-        if mensaje.tool_calls:
-            tool_calls = [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                }
-                for tc in mensaje.tool_calls
-            ]
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                contenido_acumulado += delta.content
+                yield {"tipo": "delta", "texto": delta.content}
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    entrada = tool_calls_acumulados.setdefault(
+                        tc.index,
+                        {"id": None, "type": "function", "function": {"name": "", "arguments": ""}},
+                    )
+                    if tc.id:
+                        entrada["id"] = tc.id
+                    if tc.function and tc.function.name:
+                        entrada["function"]["name"] += tc.function.name
+                    if tc.function and tc.function.arguments:
+                        entrada["function"]["arguments"] += tc.function.arguments
 
-        return {
-            "role": "assistant",
-            "content": mensaje.content,
+        tool_calls = [tool_calls_acumulados[i] for i in sorted(tool_calls_acumulados)] or None
+
+        yield {
+            "tipo": "fin",
+            "content": contenido_acumulado or None,
             "tool_calls": tool_calls,
             "proveedor": proveedor,
         }
