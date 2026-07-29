@@ -45,17 +45,26 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
     tramites_citados: list[str] = []
 
     for _ in range(MAX_ITERACIONES_TOOLS):
-        respuesta = chat_client.completar(messages=messages, tools=TOOL_SCHEMAS)
+        contenido = ""
+        tool_calls = None
+        proveedor = None
 
-        if not respuesta["tool_calls"]:
+        for evento in chat_client.completar_streaming(messages=messages, tools=TOOL_SCHEMAS):
+            if evento["tipo"] == "delta":
+                yield {"tipo": "texto", "delta": evento["texto"]}
+            else:
+                contenido = evento["content"]
+                tool_calls = evento["tool_calls"]
+                proveedor = evento["proveedor"]
+
+        if not tool_calls:
             sessions.guardar_mensaje(
                 conn,
                 session_id,
                 rol="assistant",
-                contenido=respuesta["content"],
-                proveedor=respuesta.get("proveedor"),
+                contenido=contenido,
+                proveedor=proveedor,
             )
-            yield from _emitir_respuesta_trozeada(respuesta["content"] or "")
             yield {"tipo": "fin", "fuentes": _armar_fuentes(conn, tramites_citados)}
             return
 
@@ -63,19 +72,19 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
             conn,
             session_id,
             rol="assistant",
-            contenido=respuesta["content"],
-            tool_calls=respuesta["tool_calls"],
-            proveedor=respuesta.get("proveedor"),
+            contenido=contenido,
+            tool_calls=tool_calls,
+            proveedor=proveedor,
         )
         messages.append(
             {
                 "role": "assistant",
-                "content": respuesta["content"],
-                "tool_calls": respuesta["tool_calls"],
+                "content": contenido,
+                "tool_calls": tool_calls,
             }
         )
 
-        for tool_call in respuesta["tool_calls"]:
+        for tool_call in tool_calls:
             nombre = tool_call["function"]["name"]
             argumentos = json.loads(tool_call["function"]["arguments"])
             resultado = ejecutar_tool(nombre, argumentos, conn, embed_fn, rerank_fn)
@@ -93,13 +102,8 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
 
     mensaje_agotado = "No pude resolver tu consulta en este momento. ¿Podés reformularla?"
     sessions.guardar_mensaje(conn, session_id, rol="assistant", contenido=mensaje_agotado)
-    yield from _emitir_respuesta_trozeada(mensaje_agotado)
+    yield {"tipo": "texto", "delta": mensaje_agotado}
     yield {"tipo": "fin", "fuentes": _armar_fuentes(conn, tramites_citados)}
-
-
-def _emitir_respuesta_trozeada(texto: str):
-    for palabra in texto.split():
-        yield {"tipo": "texto", "delta": palabra + " "}
 
 
 def _armar_fuentes(conn, tramites_citados: list[str]) -> list[dict]:

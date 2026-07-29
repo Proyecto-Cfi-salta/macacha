@@ -18,10 +18,17 @@ class _FakeChatClient:
         self._respuestas = respuestas
         self._indice = 0
 
-    def completar(self, messages, tools):
+    def completar_streaming(self, messages, tools):
         respuesta = self._respuestas[self._indice]
         self._indice += 1
-        return respuesta
+        if respuesta.get("content"):
+            yield {"tipo": "delta", "texto": respuesta["content"]}
+        yield {
+            "tipo": "fin",
+            "content": respuesta.get("content"),
+            "tool_calls": respuesta.get("tool_calls"),
+            "proveedor": respuesta.get("proveedor", "openai"),
+        }
 
 
 def _armar_tramite_de_prueba(conn, tramite_id="RC-0001", nombre_oficial="Actas Regulares"):
