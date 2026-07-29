@@ -67,6 +67,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
     )
 
     tramites_citados: list[str] = []
+    candidatos_buscados: dict[str, str] = {}
 
     for _ in range(MAX_ITERACIONES_TOOLS):
         contenido = ""
@@ -82,6 +83,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
                 proveedor = evento["proveedor"]
 
         if not tool_calls:
+            _citar_candidatos_mencionados(contenido, candidatos_buscados, tramites_citados)
             sessions.guardar_mensaje(
                 conn,
                 session_id,
@@ -115,6 +117,14 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
 
             if "tramite_id" in argumentos and argumentos["tramite_id"] not in tramites_citados:
                 tramites_citados.append(argumentos["tramite_id"])
+            elif nombre == "buscar_tramite":
+                if len(resultado) == 1:
+                    tramite_id_unico = resultado[0]["tramite_id"]
+                    if tramite_id_unico not in tramites_citados:
+                        tramites_citados.append(tramite_id_unico)
+                else:
+                    for candidato in resultado:
+                        candidatos_buscados[candidato["tramite_id"]] = candidato["nombre_oficial"]
 
             resultado_json = json.dumps(resultado, ensure_ascii=False)
             sessions.guardar_mensaje(
@@ -128,6 +138,22 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
     sessions.guardar_mensaje(conn, session_id, rol="assistant", contenido=mensaje_agotado)
     yield {"tipo": "texto", "delta": mensaje_agotado}
     yield {"tipo": "fin", "fuentes": _armar_fuentes(conn, tramites_citados)}
+
+
+def _citar_candidatos_mencionados(
+    texto: str | None, candidatos: dict[str, str], tramites_citados: list[str]
+) -> None:
+    if not texto:
+        return
+    menciones = []
+    for tramite_id, nombre_oficial in candidatos.items():
+        indice = texto.find(nombre_oficial)
+        if indice != -1:
+            menciones.append((indice, tramite_id))
+    menciones.sort()
+    for _, tramite_id in menciones:
+        if tramite_id not in tramites_citados:
+            tramites_citados.append(tramite_id)
 
 
 def _armar_fuentes(conn, tramites_citados: list[str]) -> list[dict]:

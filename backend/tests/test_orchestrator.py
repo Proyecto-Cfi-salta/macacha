@@ -3,6 +3,7 @@ import uuid
 from ingest import repository as repo
 from agent import sessions
 from agent.orchestrator import procesar_turno
+from agent.tools import buscar_tramite
 
 
 def _fake_embed_fn(texts):
@@ -179,7 +180,7 @@ def test_procesar_turno_con_dos_tramites_preserva_orden_de_citacion(db_conn, cle
     assert ids_en_orden == ["RC-0002", "RC-0001"]
 
 
-def test_procesar_turno_solo_busqueda_no_cita_fuentes(db_conn, clean_db):
+def test_procesar_turno_busqueda_con_match_unico_cita_la_fuente(db_conn, clean_db):
     _armar_tramite_de_prueba(db_conn)
     session_id = str(uuid.uuid4())
 
@@ -196,13 +197,135 @@ def test_procesar_turno_solo_busqueda_no_cita_fuentes(db_conn, clean_db):
                     }
                 ],
             },
-            {"role": "assistant", "content": "¿Cuál trámite te interesa?", "tool_calls": None},
+            {
+                "role": "assistant",
+                "content": "Es el trámite de Actas Regulares, mirá el panel para más detalle.",
+                "tool_calls": None,
+            },
         ]
     )
 
     eventos = list(
         procesar_turno(
             db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "qué necesito para un acta"
+        )
+    )
+    db_conn.commit()
+
+    assert eventos[-1] == {
+        "tipo": "fin",
+        "fuentes": [
+            {
+                "tramite_id": "RC-0001",
+                "nombre_oficial": "Actas Regulares",
+                "fuente_url": "https://registrocivilsalta.gob.ar/",
+            }
+        ],
+    }
+
+
+def test_procesar_turno_busqueda_con_varios_candidatos_cita_el_mencionado_en_el_texto(db_conn, clean_db):
+    _armar_tramite_de_prueba(db_conn, tramite_id="RC-0002", nombre_oficial="Acta de Matrimonio")
+    _armar_tramite_de_prueba(db_conn, tramite_id="RC-0001", nombre_oficial="Acta de Nacimiento")
+    session_id = str(uuid.uuid4())
+
+    candidatos = buscar_tramite(db_conn, _fake_embed_fn, _fake_rerank_fn, "acta")
+    assert len(candidatos) == 2
+
+    chat_client = _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "buscar_tramite", "arguments": '{"query": "acta"}'},
+                    }
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": "El trámite que necesitás es Acta de Nacimiento.",
+                "tool_calls": None,
+            },
+        ]
+    )
+
+    eventos = list(
+        procesar_turno(
+            db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "qué necesito para un acta"
+        )
+    )
+    db_conn.commit()
+
+    fuentes = eventos[-1]["fuentes"]
+    assert [f["tramite_id"] for f in fuentes] == ["RC-0001"]
+
+
+def test_procesar_turno_busqueda_ambigua_sin_nombre_en_el_texto_no_cita_fuentes(db_conn, clean_db):
+    _armar_tramite_de_prueba(db_conn, tramite_id="RC-0002", nombre_oficial="Acta de Matrimonio")
+    _armar_tramite_de_prueba(db_conn, tramite_id="RC-0001", nombre_oficial="Acta de Nacimiento")
+    session_id = str(uuid.uuid4())
+
+    candidatos = buscar_tramite(db_conn, _fake_embed_fn, _fake_rerank_fn, "acta")
+    assert len(candidatos) == 2
+
+    chat_client = _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "buscar_tramite", "arguments": '{"query": "acta"}'},
+                    }
+                ],
+            },
+            {"role": "assistant", "content": "¿Cuál de las dos actas te interesa?", "tool_calls": None},
+        ]
+    )
+
+    eventos = list(
+        procesar_turno(
+            db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "qué necesito para un acta"
+        )
+    )
+    db_conn.commit()
+
+    assert eventos[-1] == {"tipo": "fin", "fuentes": []}
+
+
+def test_procesar_turno_busqueda_sin_resultados_no_cita_fuentes(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+
+    chat_client = _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "buscar_tramite", "arguments": '{"query": "algo inexistente"}'},
+                    }
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": "No encontré ningún trámite relacionado.",
+                "tool_calls": None,
+            },
+        ]
+    )
+
+    eventos = list(
+        procesar_turno(
+            db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "algo que no existe"
         )
     )
     db_conn.commit()
