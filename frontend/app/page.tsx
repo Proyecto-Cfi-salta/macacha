@@ -28,6 +28,11 @@ function Chat({ sessionId }: { sessionId: string }) {
   const { tramites: tramitesFrecuentes } = useTramitesFrecuentes(tramite?.organismo);
   const [tab, setTab] = useState<Tab>("chat");
 
+  function preguntarSobre(mensaje: string) {
+    enviarMensaje(mensaje);
+    setTab("chat");
+  }
+
   return (
     <div className="mx-auto flex h-screen max-w-6xl flex-col md:flex-row">
       <nav className="flex border-b border-gray-200 md:hidden">
@@ -84,7 +89,11 @@ function Chat({ sessionId }: { sessionId: string }) {
           tab === "info" ? "block" : "hidden"
         }`}
       >
-        <TramiteInfoPanel tramite={tramite} />
+        <TramiteInfoPanel
+          tramite={tramite}
+          onPreguntar={preguntarSobre}
+          preguntarDeshabilitado={enviando}
+        />
       </aside>
     </div>
   );
