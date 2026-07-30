@@ -7,8 +7,11 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "buscar_tramite",
             "description": (
-                "Busca trámites relevantes a la pregunta del usuario cuando "
-                "todavía no se conoce el ID del trámite específico."
+                "Busca trámites relevantes a la pregunta del usuario. Usala "
+                "siempre antes de nombrarle a la persona cuál es su trámite, "
+                "incluso si te parece obvio cuál es — nunca asumas de "
+                "memoria qué trámite corresponde sin confirmarlo primero con "
+                "esta herramienta."
             ),
             "parameters": {
                 "type": "object",
