@@ -92,7 +92,13 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
                 contenido=contenido,
                 proveedor=proveedor,
             )
-            yield {"tipo": "fin", "fuentes": _armar_fuentes(conn, tramites_citados)}
+            yield {
+                "tipo": "fin",
+                "fuentes": _armar_fuentes(conn, tramites_citados),
+                "candidatos_ambiguos": (
+                    [] if tramites_citados else _armar_candidatos_ambiguos(conn, candidatos_buscados)
+                ),
+            }
             return
 
         sessions.guardar_mensaje(
@@ -138,7 +144,13 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
     mensaje_agotado = "No pude resolver tu consulta en este momento. ¿Podés reformularla?"
     sessions.guardar_mensaje(conn, session_id, rol="assistant", contenido=mensaje_agotado)
     yield {"tipo": "texto", "delta": mensaje_agotado}
-    yield {"tipo": "fin", "fuentes": _armar_fuentes(conn, tramites_citados)}
+    yield {
+        "tipo": "fin",
+        "fuentes": _armar_fuentes(conn, tramites_citados),
+        "candidatos_ambiguos": (
+            [] if tramites_citados else _armar_candidatos_ambiguos(conn, candidatos_buscados)
+        ),
+    }
 
 
 _STOPWORDS = {"de", "del", "la", "el", "los", "las", "en", "con", "ante", "y", "o", "a", "al", "un", "una"}
@@ -194,3 +206,19 @@ def _armar_fuentes(conn, tramites_citados: list[str]) -> list[dict]:
             }
         )
     return fuentes
+
+
+def _armar_candidatos_ambiguos(conn, candidatos_buscados: dict[str, str]) -> list[dict]:
+    candidatos_ambiguos = []
+    for tramite_id in list(candidatos_buscados.keys())[:3]:
+        snapshot = obtener_snapshot_vigente(conn, tramite_id)
+        if snapshot is None:
+            continue
+        candidatos_ambiguos.append(
+            {
+                "tramite_id": tramite_id,
+                "nombre_oficial": snapshot["nombre_oficial"],
+                "descripcion": snapshot.get("descripcion", ""),
+            }
+        )
+    return candidatos_ambiguos

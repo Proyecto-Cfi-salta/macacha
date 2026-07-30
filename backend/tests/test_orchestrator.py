@@ -67,7 +67,7 @@ def test_procesar_turno_sin_tool_calls(db_conn, clean_db):
 
     texto = "".join(e["delta"] for e in eventos if e["tipo"] == "texto")
     assert texto.strip() == "Hola, en qué te ayudo?"
-    assert eventos[-1] == {"tipo": "fin", "fuentes": []}
+    assert eventos[-1] == {"tipo": "fin", "fuentes": [], "candidatos_ambiguos": []}
 
 
 def test_procesar_turno_con_tool_call_arma_fuentes(db_conn, clean_db):
@@ -123,6 +123,7 @@ def test_procesar_turno_con_tool_call_arma_fuentes(db_conn, clean_db):
                 "fuente_url": "https://registrocivilsalta.gob.ar/",
             }
         ],
+        "candidatos_ambiguos": [],
     }
 
 
@@ -221,6 +222,7 @@ def test_procesar_turno_busqueda_con_match_unico_cita_la_fuente(db_conn, clean_d
                 "fuente_url": "https://registrocivilsalta.gob.ar/",
             }
         ],
+        "candidatos_ambiguos": [],
     }
 
 
@@ -262,6 +264,42 @@ def test_procesar_turno_busqueda_con_varios_candidatos_cita_el_mencionado_en_el_
 
     fuentes = eventos[-1]["fuentes"]
     assert [f["tramite_id"] for f in fuentes] == ["RC-0001"]
+
+
+def test_procesar_turno_resuelto_no_expone_candidatos_ambiguos(db_conn, clean_db):
+    _armar_tramite_de_prueba(db_conn, tramite_id="RC-0002", nombre_oficial="Acta de Matrimonio")
+    _armar_tramite_de_prueba(db_conn, tramite_id="RC-0001", nombre_oficial="Acta de Nacimiento")
+    session_id = str(uuid.uuid4())
+
+    chat_client = _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "buscar_tramite", "arguments": '{"query": "acta"}'},
+                    }
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": "El trámite que necesitás es Acta de Nacimiento.",
+                "tool_calls": None,
+            },
+        ]
+    )
+
+    eventos = list(
+        procesar_turno(
+            db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "qué necesito para un acta"
+        )
+    )
+    db_conn.commit()
+
+    assert eventos[-1]["candidatos_ambiguos"] == []
 
 
 def test_procesar_turno_cita_candidatos_parafraseados_con_nombre_largo(db_conn, clean_db):
@@ -345,7 +383,12 @@ def test_procesar_turno_busqueda_ambigua_sin_nombre_en_el_texto_no_cita_fuentes(
     )
     db_conn.commit()
 
-    assert eventos[-1] == {"tipo": "fin", "fuentes": []}
+    assert eventos[-1]["fuentes"] == []
+    candidatos_ambiguos = eventos[-1]["candidatos_ambiguos"]
+    assert {c["tramite_id"]: c["descripcion"] for c in candidatos_ambiguos} == {
+        "RC-0001": "Descripción",
+        "RC-0002": "Descripción",
+    }
 
 
 def test_procesar_turno_busqueda_sin_resultados_no_cita_fuentes(db_conn, clean_db):
@@ -379,7 +422,7 @@ def test_procesar_turno_busqueda_sin_resultados_no_cita_fuentes(db_conn, clean_d
     )
     db_conn.commit()
 
-    assert eventos[-1] == {"tipo": "fin", "fuentes": []}
+    assert eventos[-1] == {"tipo": "fin", "fuentes": [], "candidatos_ambiguos": []}
 
 
 def test_procesar_turno_persiste_los_mensajes_visibles(db_conn, clean_db):
