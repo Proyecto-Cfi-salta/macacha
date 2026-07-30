@@ -137,3 +137,21 @@ def obtener_tramites_frecuentes(conn, organismo: str, limite: int = 5) -> list[d
             {"tramite_id": row[0], "nombre_oficial": row[1], "veces_consultado": row[2]}
             for row in cur.fetchall()
         ]
+
+
+def obtener_top_tramites(conn, limite: int = 3) -> list[dict]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT t.id, t.nombre_oficial, t.veces_consultado
+            FROM tramites t
+            WHERE t.veces_consultado > 0
+            ORDER BY t.veces_consultado DESC, t.id ASC
+            LIMIT %s
+            """,
+            (limite,),
+        )
+        return [
+            {"tramite_id": row[0], "nombre_oficial": row[1], "veces_consultado": row[2]}
+            for row in cur.fetchall()
+        ]

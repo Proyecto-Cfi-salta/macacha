@@ -144,3 +144,45 @@ def test_obtener_tramites_frecuentes_no_mezcla_organismos(db_conn, clean_db):
     assert resultado == [
         {"tramite_id": "RC-0001", "nombre_oficial": "Actas Regulares", "veces_consultado": 1}
     ]
+
+
+def test_obtener_top_tramites_ordena_global_mezclando_organismos(db_conn, clean_db):
+    rc_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    otro_id = repo.upsert_organismo(db_conn, "Rentas")
+    repo.upsert_tramite(db_conn, "RC-0001", rc_id, "Actas", "Actas Regulares")
+    repo.upsert_tramite(db_conn, "RE-0001", otro_id, "Impuestos", "Pago de Rentas")
+    db_conn.commit()
+
+    repo.incrementar_veces_consultado(db_conn, "RC-0001")
+    repo.incrementar_veces_consultado(db_conn, "RE-0001")
+    repo.incrementar_veces_consultado(db_conn, "RE-0001")
+    db_conn.commit()
+
+    resultado = repo.obtener_top_tramites(db_conn)
+
+    assert resultado == [
+        {"tramite_id": "RE-0001", "nombre_oficial": "Pago de Rentas", "veces_consultado": 2},
+        {"tramite_id": "RC-0001", "nombre_oficial": "Actas Regulares", "veces_consultado": 1},
+    ]
+
+
+def test_obtener_top_tramites_excluye_no_consultados(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    db_conn.commit()
+
+    assert repo.obtener_top_tramites(db_conn) == []
+
+
+def test_obtener_top_tramites_respeta_el_limite(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    for i in range(1, 6):
+        tramite_id = f"RC-000{i}"
+        repo.upsert_tramite(db_conn, tramite_id, organismo_id, "Actas", f"Trámite {i}")
+        db_conn.commit()
+        repo.incrementar_veces_consultado(db_conn, tramite_id)
+        db_conn.commit()
+
+    resultado = repo.obtener_top_tramites(db_conn)
+
+    assert len(resultado) == 3
