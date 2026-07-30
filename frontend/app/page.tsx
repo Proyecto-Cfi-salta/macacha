@@ -4,11 +4,9 @@ import { useState } from "react";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { TramiteInfoPanel } from "../components/TramiteInfoPanel";
-import { TramitesFrecuentesPanel } from "../components/TramitesFrecuentesPanel";
 import { useChatStream } from "../hooks/useChatStream";
 import { useSession } from "../hooks/useSession";
 import { useTramiteActual } from "../hooks/useTramiteActual";
-import { useTramitesFrecuentes } from "../hooks/useTramitesFrecuentes";
 
 export default function Home() {
   const { sessionId } = useSession();
@@ -20,12 +18,11 @@ export default function Home() {
   return <Chat sessionId={sessionId} />;
 }
 
-type Tab = "chat" | "info" | "frecuentes";
+type Tab = "chat" | "info";
 
 function Chat({ sessionId }: { sessionId: string }) {
   const { mensajes, enviando, enviarMensaje } = useChatStream(sessionId);
   const { tramite } = useTramiteActual(mensajes);
-  const { tramites: tramitesFrecuentes } = useTramitesFrecuentes(tramite?.organismo);
   const [tab, setTab] = useState<Tab>("chat");
 
   function preguntarSobre(mensaje: string) {
@@ -42,18 +39,7 @@ function Chat({ sessionId }: { sessionId: string }) {
         <TabButton activo={tab === "info"} onClick={() => setTab("info")}>
           Info del trámite
         </TabButton>
-        <TabButton activo={tab === "frecuentes"} onClick={() => setTab("frecuentes")}>
-          Más consultados
-        </TabButton>
       </nav>
-
-      <aside
-        className={`w-full flex-1 overflow-y-auto border-gray-200 p-4 md:block md:flex-none md:w-64 md:border-r ${
-          tab === "frecuentes" ? "block" : "hidden"
-        }`}
-      >
-        <TramitesFrecuentesPanel tramites={tramitesFrecuentes} />
-      </aside>
 
       <main
         className={`min-w-0 flex-1 flex-col ${tab === "chat" ? "flex" : "hidden"} md:flex`}
