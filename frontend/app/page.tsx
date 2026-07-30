@@ -4,9 +4,11 @@ import { useState } from "react";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { TramiteInfoPanel } from "../components/TramiteInfoPanel";
+import { TramitesAmbiguosPanel } from "../components/TramitesAmbiguosPanel";
+import { TramitesFrecuentesPanel } from "../components/TramitesFrecuentesPanel";
 import { useChatStream } from "../hooks/useChatStream";
+import { usePanelTramite } from "../hooks/usePanelTramite";
 import { useSession } from "../hooks/useSession";
-import { useTramiteActual } from "../hooks/useTramiteActual";
 
 export default function Home() {
   const { sessionId } = useSession();
@@ -22,7 +24,7 @@ type Tab = "chat" | "info";
 
 function Chat({ sessionId }: { sessionId: string }) {
   const { mensajes, enviando, enviarMensaje } = useChatStream(sessionId);
-  const { tramite } = useTramiteActual(mensajes);
+  const vista = usePanelTramite(mensajes);
   const [tab, setTab] = useState<Tab>("chat");
 
   function preguntarSobre(mensaje: string) {
@@ -75,11 +77,27 @@ function Chat({ sessionId }: { sessionId: string }) {
           tab === "info" ? "block" : "hidden"
         }`}
       >
-        <TramiteInfoPanel
-          tramite={tramite}
-          onPreguntar={preguntarSobre}
-          preguntarDeshabilitado={enviando}
-        />
+        {vista.tipo === "tramite" && (
+          <TramiteInfoPanel
+            tramite={vista.tramite}
+            onPreguntar={preguntarSobre}
+            preguntarDeshabilitado={enviando}
+          />
+        )}
+        {vista.tipo === "ambiguo" && (
+          <TramitesAmbiguosPanel
+            candidatos={vista.candidatos}
+            onPreguntar={preguntarSobre}
+            preguntarDeshabilitado={enviando}
+          />
+        )}
+        {vista.tipo === "top3" && (
+          <TramitesFrecuentesPanel
+            tramites={vista.tramites}
+            onPreguntar={preguntarSobre}
+            preguntarDeshabilitado={enviando}
+          />
+        )}
       </aside>
     </div>
   );

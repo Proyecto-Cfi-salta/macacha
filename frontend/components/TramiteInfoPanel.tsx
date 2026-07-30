@@ -9,19 +9,11 @@ export function TramiteInfoPanel({
   onPreguntar,
   preguntarDeshabilitado,
 }: {
-  tramite: TramiteDetalle | null;
+  tramite: TramiteDetalle;
   onPreguntar: (mensaje: string) => void;
   preguntarDeshabilitado: boolean;
 }) {
-  const { estaTildado, toggle } = useChecklist(tramite?.tramite_id ?? null);
-
-  if (!tramite) {
-    return (
-      <p className="text-sm text-gray-400">
-        La info del trámite va a aparecer acá.
-      </p>
-    );
-  }
+  const { estaTildado, toggle } = useChecklist(tramite.tramite_id);
 
   return (
     <div>
