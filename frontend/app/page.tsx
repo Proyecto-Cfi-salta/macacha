@@ -98,6 +98,9 @@ function Chat({ sessionId }: { sessionId: string }) {
             preguntarDeshabilitado={enviando}
           />
         )}
+        {vista.tipo === "cargando" && (
+          <p className="text-sm text-gray-400">La info del trámite va a aparecer acá.</p>
+        )}
       </aside>
     </div>
   );
