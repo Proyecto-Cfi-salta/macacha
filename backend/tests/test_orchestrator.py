@@ -264,6 +264,55 @@ def test_procesar_turno_busqueda_con_varios_candidatos_cita_el_mencionado_en_el_
     assert [f["tramite_id"] for f in fuentes] == ["RC-0001"]
 
 
+def test_procesar_turno_cita_candidatos_parafraseados_con_nombre_largo(db_conn, clean_db):
+    _armar_tramite_de_prueba(
+        db_conn,
+        tramite_id="TR-0002",
+        nombre_oficial="Denuncia laboral (irregularidades, incumplimientos, accidentes, trabajo informal)",
+    )
+    _armar_tramite_de_prueba(
+        db_conn, tramite_id="DC-0001", nombre_oficial="Denuncia/Reclamo ante Defensa del Consumidor"
+    )
+    session_id = str(uuid.uuid4())
+
+    candidatos = buscar_tramite(db_conn, _fake_embed_fn, _fake_rerank_fn, "denuncia")
+    assert len(candidatos) == 2
+
+    respuesta_parafraseada = (
+        "Veo que te interesa realizar una denuncia. Por ejemplo, puedes hacer una "
+        "Denuncia laboral relacionada con irregularidades, incumplimientos o accidentes, "
+        "que gestionan en la Secretaría de Trabajo. También puedes presentar una denuncia "
+        "o reclamo ante Defensa del Consumidor."
+    )
+
+    chat_client = _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "buscar_tramite", "arguments": '{"query": "denuncia"}'},
+                    }
+                ],
+            },
+            {"role": "assistant", "content": respuesta_parafraseada, "tool_calls": None},
+        ]
+    )
+
+    eventos = list(
+        procesar_turno(
+            db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "hola como hago una denuncia?"
+        )
+    )
+    db_conn.commit()
+
+    fuentes = eventos[-1]["fuentes"]
+    assert {f["tramite_id"] for f in fuentes} == {"TR-0002", "DC-0001"}
+
+
 def test_procesar_turno_busqueda_ambigua_sin_nombre_en_el_texto_no_cita_fuentes(db_conn, clean_db):
     _armar_tramite_de_prueba(db_conn, tramite_id="RC-0002", nombre_oficial="Acta de Matrimonio")
     _armar_tramite_de_prueba(db_conn, tramite_id="RC-0001", nombre_oficial="Acta de Nacimiento")

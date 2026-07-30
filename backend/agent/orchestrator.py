@@ -1,4 +1,5 @@
 import json
+import re
 
 from agent import sessions
 from agent.tools import TOOL_SCHEMAS, ejecutar_tool
@@ -140,16 +141,38 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
     yield {"tipo": "fin", "fuentes": _armar_fuentes(conn, tramites_citados)}
 
 
+_STOPWORDS = {"de", "del", "la", "el", "los", "las", "en", "con", "ante", "y", "o", "a", "al", "un", "una"}
+_UMBRAL_COINCIDENCIA = 0.7
+
+
+def _normalizar(texto: str) -> str:
+    sin_parentesis = re.sub(r"\([^)]*\)", " ", texto)
+    solo_palabras = re.sub(r"[^\w\s]", " ", sin_parentesis, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", solo_palabras).strip().lower()
+
+
+def _palabras_significativas(nombre_normalizado: str) -> list[str]:
+    return [p for p in nombre_normalizado.split() if len(p) >= 4 and p not in _STOPWORDS]
+
+
 def _citar_candidatos_mencionados(
     texto: str | None, candidatos: dict[str, str], tramites_citados: list[str]
 ) -> None:
     if not texto:
         return
+    texto_normalizado = _normalizar(texto)
     menciones = []
     for tramite_id, nombre_oficial in candidatos.items():
-        indice = texto.find(nombre_oficial)
-        if indice != -1:
-            menciones.append((indice, tramite_id))
+        palabras = _palabras_significativas(_normalizar(nombre_oficial))
+        if not palabras:
+            continue
+        indices_encontrados = [
+            texto_normalizado.find(palabra)
+            for palabra in palabras
+            if texto_normalizado.find(palabra) != -1
+        ]
+        if len(indices_encontrados) / len(palabras) >= _UMBRAL_COINCIDENCIA:
+            menciones.append((min(indices_encontrados), tramite_id))
     menciones.sort()
     for _, tramite_id in menciones:
         if tramite_id not in tramites_citados:
