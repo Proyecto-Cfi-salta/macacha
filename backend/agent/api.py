@@ -24,6 +24,7 @@ from ingest.openai_client import build_real_client
 from ingest.repository import (
     incrementar_veces_consultado,
     obtener_snapshot_vigente,
+    obtener_top_tramites,
     obtener_tramites_frecuentes,
 )
 
@@ -130,6 +131,12 @@ def obtener_tramite(tramite_id: str, pool=Depends(obtener_pool)):
 def tramites_frecuentes(organismo: str, pool=Depends(obtener_pool)):
     with pool.connection() as conn:
         return obtener_tramites_frecuentes(conn, organismo)
+
+
+@app.get("/tramites-frecuentes")
+def top_tramites(pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        return obtener_top_tramites(conn)
 
 
 class LoginRequest(BaseModel):

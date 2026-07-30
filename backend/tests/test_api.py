@@ -344,3 +344,40 @@ def test_get_tramites_frecuentes_organismo_sin_consultas_devuelve_lista_vacia(db
 
     assert respuesta.status_code == 200
     assert respuesta.json() == []
+
+
+def test_get_tramites_frecuentes_global_devuelve_top_3(db_conn, clean_db):
+    rc_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    otro_id = repo.upsert_organismo(db_conn, "Rentas")
+    repo.upsert_tramite(db_conn, "RC-0001", rc_id, "Actas", "Actas Regulares")
+    repo.upsert_tramite(db_conn, "RE-0001", otro_id, "Impuestos", "Pago de Rentas")
+    db_conn.commit()
+    repo.incrementar_veces_consultado(db_conn, "RE-0001")
+    repo.incrementar_veces_consultado(db_conn, "RE-0001")
+    repo.incrementar_veces_consultado(db_conn, "RC-0001")
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        respuesta = client.get("/tramites-frecuentes")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == [
+        {"tramite_id": "RE-0001", "nombre_oficial": "Pago de Rentas", "veces_consultado": 2},
+        {"tramite_id": "RC-0001", "nombre_oficial": "Actas Regulares", "veces_consultado": 1},
+    ]
+
+
+def test_get_tramites_frecuentes_global_sin_consultas_devuelve_lista_vacia(db_conn, clean_db):
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        respuesta = client.get("/tramites-frecuentes")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == []
