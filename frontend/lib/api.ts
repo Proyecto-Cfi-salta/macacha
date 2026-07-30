@@ -58,3 +58,11 @@ export async function obtenerTramitesFrecuentes(
   }
   return respuesta.json();
 }
+
+export async function obtenerTopTramites(): Promise<TramiteFrecuente[]> {
+  const respuesta = await fetch(`${BASE_URL}/tramites-frecuentes`);
+  if (!respuesta.ok) {
+    return [];
+  }
+  return respuesta.json();
+}

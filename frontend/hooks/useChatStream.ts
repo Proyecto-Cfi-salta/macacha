@@ -9,16 +9,23 @@ export type Fuente = {
   fuente_url: string | null;
 };
 
+export type CandidatoAmbiguo = {
+  tramite_id: string;
+  nombre_oficial: string;
+  descripcion: string;
+};
+
 export type Mensaje = {
   rol: "user" | "assistant";
   contenido: string;
   fuentes?: Fuente[];
+  candidatosAmbiguos?: CandidatoAmbiguo[];
   error?: boolean;
 };
 
 export type EventoSSE =
   | { tipo: "texto"; delta: string }
-  | { tipo: "fin"; fuentes: Fuente[] }
+  | { tipo: "fin"; fuentes: Fuente[]; candidatos_ambiguos: CandidatoAmbiguo[] }
   | { tipo: "error"; mensaje: string };
 
 export function parsearLineasSSE(texto: string): EventoSSE[] {
@@ -52,7 +59,11 @@ export function useChatStream(sessionId: string) {
           contenido: ultimo.contenido + evento.delta,
         };
       } else if (evento.tipo === "fin") {
-        copia[copia.length - 1] = { ...ultimo, fuentes: evento.fuentes };
+        copia[copia.length - 1] = {
+          ...ultimo,
+          fuentes: evento.fuentes,
+          candidatosAmbiguos: evento.candidatos_ambiguos,
+        };
       } else if (evento.tipo === "error") {
         copia[copia.length - 1] = {
           ...ultimo,

@@ -12,9 +12,9 @@ describe("parsearLineasSSE", () => {
     ]);
   });
 
-  it("parsea un evento de fin con fuentes", () => {
+  it("parsea un evento de fin con fuentes y candidatos ambiguos vacíos", () => {
     const bloque =
-      'data: {"tipo":"fin","fuentes":[{"tramite_id":"RC-0001","nombre_oficial":"Actas Regulares","fuente_url":"https://x"}]}';
+      'data: {"tipo":"fin","fuentes":[{"tramite_id":"RC-0001","nombre_oficial":"Actas Regulares","fuente_url":"https://x"}],"candidatos_ambiguos":[]}';
 
     expect(parsearLineasSSE(bloque)).toEqual([
       {
@@ -24,6 +24,26 @@ describe("parsearLineasSSE", () => {
             tramite_id: "RC-0001",
             nombre_oficial: "Actas Regulares",
             fuente_url: "https://x",
+          },
+        ],
+        candidatos_ambiguos: [],
+      },
+    ]);
+  });
+
+  it("parsea un evento de fin con candidatos ambiguos", () => {
+    const bloque =
+      'data: {"tipo":"fin","fuentes":[],"candidatos_ambiguos":[{"tramite_id":"TR-0002","nombre_oficial":"Denuncia laboral","descripcion":"Reclamos laborales."}]}';
+
+    expect(parsearLineasSSE(bloque)).toEqual([
+      {
+        tipo: "fin",
+        fuentes: [],
+        candidatos_ambiguos: [
+          {
+            tramite_id: "TR-0002",
+            nombre_oficial: "Denuncia laboral",
+            descripcion: "Reclamos laborales.",
           },
         ],
       },
