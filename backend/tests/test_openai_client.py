@@ -44,8 +44,13 @@ class _FakeCompletions:
         self._error = error
         self.last_call = None
 
-    def create(self, model, messages, response_format):
-        self.last_call = {"model": model, "messages": messages, "response_format": response_format}
+    def create(self, model, messages, response_format, temperature=None):
+        self.last_call = {
+            "model": model,
+            "messages": messages,
+            "response_format": response_format,
+            "temperature": temperature,
+        }
         if self._error is not None:
             raise self._error
         return _FakeChatCompletionResponse(self._content)
@@ -116,6 +121,28 @@ def test_rerank_parses_json_response_as_order():
 
     assert resultado == [2, 0, 1]
     assert fake_sdk.chat.completions.last_call["model"] == "gpt-4o-mini"
+
+
+def test_rerank_usa_temperature_cero_para_resultados_deterministicos():
+    orden_json = json.dumps({"orden": [0]})
+    fake_sdk = _FakeOpenAISDK(content=orden_json)
+    client = OpenAIClient(fake_sdk)
+
+    client.rerank("una pregunta cualquiera", [{"texto": "fragmento A"}])
+
+    assert fake_sdk.chat.completions.last_call["temperature"] == 0
+
+
+def test_generate_faqs_no_fuerza_temperature_cero():
+    faq_json = json.dumps({"faqs": [{"pregunta": "p", "respuesta": "r"}]})
+    fake_sdk = _FakeOpenAISDK(content=faq_json)
+    client = OpenAIClient(fake_sdk)
+
+    client.generate_faqs(
+        nombre_oficial="Actas Regulares", descripcion="desc", requisitos=["DNI"], pasos=["Paso 1"]
+    )
+
+    assert fake_sdk.chat.completions.last_call["temperature"] is None
 
 
 def test_generate_faqs_usa_gemini_si_openai_falla():

@@ -50,16 +50,18 @@ class OpenAIClient:
             'Respondé únicamente con JSON con esta forma: '
             '{"orden": [<índices originales, del más al menos relevante>]}'
         )
-        content = self._completar_con_fallback(prompt)
+        content = self._completar_con_fallback(prompt, temperature=0)
         data = json.loads(content)
         return data["orden"]
 
-    def _completar_con_fallback(self, prompt: str) -> str:
+    def _completar_con_fallback(self, prompt: str, temperature: float | None = None) -> str:
+        kwargs = {} if temperature is None else {"temperature": temperature}
         try:
             response = self._sdk_client.chat.completions.create(
                 model=self.FAQ_MODEL_OPENAI,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
+                **kwargs,
             )
         except Exception:
             if self._sdk_client_gemini is None:
@@ -69,6 +71,7 @@ class OpenAIClient:
                 model=self.FAQ_MODEL_GEMINI,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
+                **kwargs,
             )
         return response.choices[0].message.content
 
