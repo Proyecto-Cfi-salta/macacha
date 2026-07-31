@@ -53,7 +53,12 @@ git push -u origin main
 
 1. Conectar Dokploy al repo `https://github.com/sebamasaguer/macacha.git`.
 2. Tipo: Application, build desde Dockerfile.
-3. Path del contexto de build / subcarpeta: `backend/`.
+3. Son dos campos separados, ambos relativos a la raíz del repo (si
+   ponés solo `backend` en el campo de Dockerfile Path, Dokploy busca un
+   archivo llamado literalmente `backend` y falla con "failed to read
+   dockerfile: open backend: no such file or directory"):
+   - **Dockerfile Path:** `backend/Dockerfile`
+   - **Docker Context Path:** `backend`
 4. Dominio: `api.macacha.saltia.com.ar`.
 5. Variables de entorno:
 
@@ -69,7 +74,9 @@ git push -u origin main
 
 ## 5. Crear la Application del frontend en Dokploy
 
-1. Mismo repo, subcarpeta `frontend/`.
+1. Mismo repo, mismo criterio de dos campos que el backend:
+   - **Dockerfile Path:** `frontend/Dockerfile`
+   - **Docker Context Path:** `frontend`
 2. Dominio: `macacha.saltia.com.ar`.
 3. Variable de entorno:
 
