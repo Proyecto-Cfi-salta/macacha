@@ -49,6 +49,20 @@ def test_buscar_tramite_dedupe_por_tramite_id(db_conn, clean_db):
     ]
 
 
+def test_buscar_tramite_pide_diez_chunks_para_dar_lugar_a_diversidad(db_conn, clean_db, monkeypatch):
+    llamada = {}
+
+    def _fake_buscar_chunks(query, conn, embed_fn, rerank_fn, top_k=5):
+        llamada["top_k"] = top_k
+        return []
+
+    monkeypatch.setattr(tools, "buscar_chunks", _fake_buscar_chunks)
+
+    tools.buscar_tramite(db_conn, _fake_embed_fn, _fake_rerank_fn, "denuncia")
+
+    assert llamada["top_k"] == 10
+
+
 def test_obtener_requisitos(db_conn, clean_db):
     _armar_tramite_de_prueba(db_conn)
     assert tools.obtener_requisitos(db_conn, "RC-0001") == ["DNI"]

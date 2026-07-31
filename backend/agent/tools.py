@@ -113,7 +113,7 @@ TOOL_SCHEMAS = [
 
 
 def buscar_tramite(conn, embed_fn, rerank_fn, query: str) -> list[dict]:
-    chunks = buscar_chunks(query, conn, embed_fn, rerank_fn, top_k=5)
+    chunks = buscar_chunks(query, conn, embed_fn, rerank_fn, top_k=10)
     vistos: set[str] = set()
     resultados: list[dict] = []
     for chunk in chunks:
