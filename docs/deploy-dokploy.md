@@ -4,6 +4,15 @@ Checklist para llevar Macacha a producción. Dokploy ya está instalado y
 corriendo en el servidor. Ver el diseño completo en
 `docs/superpowers/specs/2026-07-30-deploy-dokploy-design.md`.
 
+**Antes de empezar:** creá ya mismo los registros DNS del paso 6
+(`macacha.saltia.com.ar` y `api.macacha.saltia.com.ar` apuntando a la IP
+del servidor) — podés hacerlo en paralelo con todo lo demás, así ya están
+resueltos para cuando llegues a los pasos 4 y 5 y Dokploy intente emitir
+el certificado SSL. Si igualmente llegás a esos pasos antes de que el DNS
+propague, el primer intento de certificado va a fallar — forzá un
+redeploy de la Application una vez que el dominio resuelva para que
+Dokploy reintente.
+
 ## 1. Generar el secreto de producción
 
 `ADMIN_JWT_SECRET` de producción tiene que ser distinto al de desarrollo:
@@ -31,7 +40,12 @@ Guardá el resultado — se usa en el paso 4.
 
 ## 3. Push a GitHub
 
+Si todavía no existe el repo remoto, creá uno privado (desde la web de
+GitHub o con `gh repo create sebamasaguer/macacha --private`) y agregá el
+remote antes de pushear:
+
 ```bash
+git remote add origin https://github.com/sebamasaguer/macacha.git
 git push -u origin main
 ```
 
@@ -63,6 +77,16 @@ git push -u origin main
    |---|---|
    | `NEXT_PUBLIC_API_URL` | `https://api.macacha.saltia.com.ar` |
 
+   **Importante:** Next.js inlinea las variables `NEXT_PUBLIC_*` en el
+   bundle del browser durante el build, no en runtime. Esta variable
+   tiene que configurarse como **Build Arg / Build Variable** en Dokploy
+   (el `Dockerfile` la recibe con `ARG NEXT_PUBLIC_API_URL`), no solo
+   como variable de entorno de runtime — si Dokploy no tiene un campo
+   separado para build args, cargala en los dos lugares, pero la que
+   realmente importa es la de build. Si más adelante cambiás este valor,
+   hace falta un **rebuild** de la Application (no alcanza con un
+   restart o un redeploy sin rebuild).
+
 4. Activar auto-deploy en push a `main`.
 
 ## 6. DNS
@@ -85,7 +109,21 @@ cd backend
 DATABASE_URL="<connection-string-de-produccion>" python -m agent.admin.create_admin admin@macacha.gob.ar
 ```
 
-## 8. Verificación final
+## 8. Ingesta de los trámites
+
+`backend/db/schema.sql` solo crea las tablas — no carga ningún trámite.
+Corré la ingesta contra la base de producción con el archivo JSON de
+trámites que ya tenés (reemplazá `<ruta-al-archivo>`):
+
+```bash
+cd backend
+DATABASE_URL="<connection-string-de-produccion>" python -m ingest.load <ruta-al-archivo>
+```
+
+Es idempotente — se puede volver a correr sin duplicar datos ni volver a
+llamar a la API de embeddings si el contenido no cambió.
+
+## 9. Verificación final
 
 - [ ] `https://api.macacha.saltia.com.ar/docs` responde 200 con candado SSL válido.
 - [ ] `https://macacha.saltia.com.ar` carga el chat con candado SSL válido.
