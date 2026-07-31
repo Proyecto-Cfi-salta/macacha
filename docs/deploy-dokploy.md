@@ -12,7 +12,7 @@ corriendo en el servidor. Ver el diseño completo en
 openssl rand -hex 32
 ```
 
-Guardá el resultado — se usa en el paso 3.
+Guardá el resultado — se usa en el paso 4.
 
 ## 2. Crear la Database en Dokploy
 
@@ -20,7 +20,7 @@ Guardá el resultado — se usa en el paso 3.
 2. Imagen: `pgvector/pgvector:pg16` (no la imagen default de Postgres —
    necesita la extensión pgvector).
 3. Una vez creada, copiar la connection string interna que da Dokploy
-   (la vas a necesitar en el paso 3).
+   (la vas a necesitar en el paso 4).
 4. Aplicar el esquema una sola vez, desde tu máquina (necesita conexión
    de red hacia la base — Dokploy suele tener una opción para exponer el
    puerto temporalmente):
