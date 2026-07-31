@@ -1,6 +1,7 @@
 .superpowers/
 backend/__pycache__/
 backend/**/__pycache__/
+backend/.venv/
 *.pyc
 .env
 frontend/node_modules/
