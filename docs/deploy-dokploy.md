@@ -78,21 +78,20 @@ git push -u origin main
    - **Dockerfile Path:** `frontend/Dockerfile`
    - **Docker Context Path:** `frontend`
 2. Dominio: `macacha.saltia.com.ar`.
-3. Variable de entorno:
+3. **Importante:** Next.js inlinea las variables `NEXT_PUBLIC_*` en el
+   bundle del browser durante el build, no en runtime — no alcanza con
+   cargarla en las variables de entorno normales. En la pestaña
+   **Environment** de la Application, además del cuadro normal de
+   variables de runtime hay un cuadro separado llamado **"Build Time
+   Arguments"** (recibido por el `Dockerfile` vía `ARG
+   NEXT_PUBLIC_API_URL`). Ahí es donde va:
 
-   | Variable | Valor |
-   |---|---|
-   | `NEXT_PUBLIC_API_URL` | `https://api.macacha.saltia.com.ar` |
+   ```
+   NEXT_PUBLIC_API_URL=https://api.macacha.saltia.com.ar
+   ```
 
-   **Importante:** Next.js inlinea las variables `NEXT_PUBLIC_*` en el
-   bundle del browser durante el build, no en runtime. Esta variable
-   tiene que configurarse como **Build Arg / Build Variable** en Dokploy
-   (el `Dockerfile` la recibe con `ARG NEXT_PUBLIC_API_URL`), no solo
-   como variable de entorno de runtime — si Dokploy no tiene un campo
-   separado para build args, cargala en los dos lugares, pero la que
-   realmente importa es la de build. Si más adelante cambiás este valor,
-   hace falta un **rebuild** de la Application (no alcanza con un
-   restart o un redeploy sin rebuild).
+   Si más adelante cambiás este valor, hace falta un **rebuild** de la
+   Application (no alcanza con un restart o un redeploy sin rebuild).
 
 4. Activar auto-deploy en push a `main`.
 
