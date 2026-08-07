@@ -1,15 +1,30 @@
-from fastapi import HTTPException, Request
+from dataclasses import dataclass
+
+from fastapi import Depends, HTTPException, Request
 
 from agent.admin import security
 
 
-def requiere_admin(request: Request) -> str:
+@dataclass
+class AdminActual:
+    id: str
+    rol: str
+    organismo_id: int | None
+
+
+def requiere_admin(request: Request) -> AdminActual:
     token = request.cookies.get("admin_session")
     if token is None:
         raise HTTPException(status_code=401, detail="No autenticado")
 
-    admin_id = security.decodificar_token(token)
-    if admin_id is None:
+    payload = security.decodificar_token(token)
+    if payload is None:
         raise HTTPException(status_code=401, detail="No autenticado")
 
-    return admin_id
+    return AdminActual(id=payload["sub"], rol=payload["rol"], organismo_id=payload["organismo_id"])
+
+
+def requiere_super_admin(admin: AdminActual = Depends(requiere_admin)) -> AdminActual:
+    if admin.rol != "super_admin":
+        raise HTTPException(status_code=403, detail="Requiere permisos de super admin")
+    return admin
