@@ -133,3 +133,74 @@ def _extraer_tramites_citados_batch(conn, session_ids: list[str]) -> dict[str, l
             if tramite_id and tramite_id not in citados:
                 citados.append(tramite_id)
     return citados_por_sesion
+
+
+def listar_sesiones_de_organismo(
+    conn, organismo_id: int, page: int, page_size: int
+) -> tuple[list[dict], int]:
+    filas = _listar_todas_las_sesiones(conn)
+    if not filas:
+        return [], 0
+
+    session_ids = [str(sesion_id) for sesion_id, _ in filas]
+    citados = _extraer_tramites_citados_batch(conn, session_ids)
+    organismos_de_tramites = _organismos_de_tramites(conn, citados)
+
+    filtradas = [
+        (sesion_id, creado_en)
+        for sesion_id, creado_en in filas
+        if any(
+            organismos_de_tramites.get(tramite_id) == organismo_id
+            for tramite_id in citados.get(str(sesion_id), [])
+        )
+    ]
+
+    total = len(filtradas)
+    offset = (page - 1) * page_size
+    pagina = filtradas[offset : offset + page_size]
+
+    if not pagina:
+        return [], total
+
+    ids_pagina = [str(sesion_id) for sesion_id, _ in pagina]
+    conteos = _contar_mensajes_visibles_batch(conn, ids_pagina)
+    ultimos = _obtener_ultimo_mensaje_batch(conn, ids_pagina)
+
+    resultado = [
+        {
+            "id": str(sesion_id),
+            "creado_en": creado_en.isoformat(),
+            "cantidad_mensajes": conteos.get(str(sesion_id), 0),
+            "ultimo_mensaje": ultimos.get(str(sesion_id)),
+            "tramites_citados": citados.get(str(sesion_id), []),
+        }
+        for sesion_id, creado_en in pagina
+    ]
+    return resultado, total
+
+
+def sesion_pertenece_a_organismo(conn, session_id: str, organismo_id: int) -> bool:
+    citados = _extraer_tramites_citados_batch(conn, [session_id])
+    tramites_citados = citados.get(session_id, [])
+    if not tramites_citados:
+        return False
+    organismos_de_tramites = _organismos_de_tramites(conn, {session_id: tramites_citados})
+    return any(organismos_de_tramites.get(t) == organismo_id for t in tramites_citados)
+
+
+def _listar_todas_las_sesiones(conn) -> list[tuple]:
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, created_at FROM sesiones ORDER BY created_at DESC")
+        return cur.fetchall()
+
+
+def _organismos_de_tramites(conn, citados_por_sesion: dict[str, list[str]]) -> dict[str, int]:
+    tramite_ids = {tid for citas in citados_por_sesion.values() for tid in citas}
+    if not tramite_ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, organismo_id FROM tramites WHERE id = ANY(%s)",
+            (list(tramite_ids),),
+        )
+        return {tramite_id: organismo_id for tramite_id, organismo_id in cur.fetchall()}
