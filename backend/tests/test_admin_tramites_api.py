@@ -79,9 +79,9 @@ def test_listar_tramites_devuelve_lista(db_conn, clean_db, monkeypatch):
     assert respuesta.json()[0]["id"] == "RC-0001"
 
 
-def test_listar_organismos_devuelve_nombres(db_conn, clean_db, monkeypatch):
+def test_listar_organismos_devuelve_id_y_nombre(db_conn, clean_db, monkeypatch):
     monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
-    repo.upsert_organismo(db_conn, "Registro Civil")
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
     db_conn.commit()
 
     api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
@@ -93,7 +93,7 @@ def test_listar_organismos_devuelve_nombres(db_conn, clean_db, monkeypatch):
         api.app.dependency_overrides.clear()
 
     assert respuesta.status_code == 200
-    assert respuesta.json() == ["Registro Civil"]
+    assert respuesta.json() == [{"id": organismo_id, "nombre": "Registro Civil"}]
 
 
 def test_obtener_tramite_admin_inexistente_devuelve_404(db_conn, clean_db, monkeypatch):
