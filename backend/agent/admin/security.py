@@ -15,17 +15,23 @@ def verify_password(password: str, password_hash: str) -> bool:
     return _pwd_context.verify(password, password_hash)
 
 
-def crear_token(admin_id: str) -> str:
+def crear_token(admin: dict) -> str:
     payload = {
-        "sub": admin_id,
+        "sub": admin["id"],
+        "rol": admin["rol"],
+        "organismo_id": admin["organismo_id"],
         "exp": datetime.now(timezone.utc) + timedelta(hours=24),
     }
     return jwt.encode(payload, os.environ["ADMIN_JWT_SECRET"], algorithm="HS256")
 
 
-def decodificar_token(token: str) -> str | None:
+def decodificar_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, os.environ["ADMIN_JWT_SECRET"], algorithms=["HS256"])
     except jwt.PyJWTError:
         return None
-    return payload.get("sub")
+    return {
+        "sub": payload.get("sub"),
+        "rol": payload.get("rol"),
+        "organismo_id": payload.get("organismo_id"),
+    }

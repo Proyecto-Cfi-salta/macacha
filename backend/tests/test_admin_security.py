@@ -15,10 +15,30 @@ def test_verify_password_rechaza_password_incorrecta():
     assert security.verify_password("otra-cosa", hash_) is False
 
 
-def test_crear_token_y_decodificar_token_devuelve_admin_id(monkeypatch):
+def test_crear_token_y_decodificar_token_devuelve_claims(monkeypatch):
     monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
-    token = security.crear_token("admin-1")
-    assert security.decodificar_token(token) == "admin-1"
+    admin = {"id": "admin-1", "rol": "admin_organismo", "organismo_id": 7}
+
+    token = security.crear_token(admin)
+
+    assert security.decodificar_token(token) == {
+        "sub": "admin-1",
+        "rol": "admin_organismo",
+        "organismo_id": 7,
+    }
+
+
+def test_crear_token_con_organismo_id_none(monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    admin = {"id": "admin-1", "rol": "super_admin", "organismo_id": None}
+
+    token = security.crear_token(admin)
+
+    assert security.decodificar_token(token) == {
+        "sub": "admin-1",
+        "rol": "super_admin",
+        "organismo_id": None,
+    }
 
 
 def test_decodificar_token_invalido_devuelve_none(monkeypatch):
@@ -29,7 +49,12 @@ def test_decodificar_token_invalido_devuelve_none(monkeypatch):
 def test_decodificar_token_expirado_devuelve_none(monkeypatch):
     monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
     token_vencido = jwt.encode(
-        {"sub": "admin-1", "exp": datetime.now(timezone.utc) - timedelta(hours=1)},
+        {
+            "sub": "admin-1",
+            "rol": "admin_organismo",
+            "organismo_id": 1,
+            "exp": datetime.now(timezone.utc) - timedelta(hours=1),
+        },
         "secreto-de-test",
         algorithm="HS256",
     )
@@ -39,7 +64,12 @@ def test_decodificar_token_expirado_devuelve_none(monkeypatch):
 def test_decodificar_token_firmado_con_otro_secreto_devuelve_none(monkeypatch):
     monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
     token_ajeno = jwt.encode(
-        {"sub": "admin-1", "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+        {
+            "sub": "admin-1",
+            "rol": "admin_organismo",
+            "organismo_id": 1,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        },
         "otro-secreto",
         algorithm="HS256",
     )
