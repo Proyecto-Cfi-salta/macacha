@@ -233,22 +233,42 @@ def admin_obtener_sesion(
 
 
 @app.get("/admin/tramites")
-def admin_listar_tramites(admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)):
+def admin_listar_tramites(admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)):
     with pool.connection() as conn:
-        return admin_tramites_repository.listar_tramites(conn)
+        organismo_id = admin.organismo_id if admin.rol == "admin_organismo" else None
+        return admin_tramites_repository.listar_tramites(conn, organismo_id)
 
 
 @app.get("/admin/organismos")
-def admin_listar_organismos(admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)):
+def admin_listar_organismos(admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)):
     with pool.connection() as conn:
         return admin_tramites_repository.listar_organismos(conn)
 
 
+def _verificar_tramite_de_mi_organismo(conn, admin: AdminActual, tramite_id: str) -> None:
+    if admin.rol != "admin_organismo":
+        return
+    organismo_del_tramite = admin_tramites_repository.obtener_organismo_id_de_tramite(conn, tramite_id)
+    if organismo_del_tramite != admin.organismo_id:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+
+
+def _verificar_payload_de_mi_organismo(conn, admin: AdminActual, organismo_payload: str) -> None:
+    if admin.rol != "admin_organismo":
+        return
+    nombre_organismo_admin = admin_tramites_repository.obtener_nombre_organismo(conn, admin.organismo_id)
+    if organismo_payload != nombre_organismo_admin:
+        raise HTTPException(
+            status_code=400, detail="No podés asignar un trámite a otro organismo"
+        )
+
+
 @app.get("/admin/tramites/{tramite_id}")
 def admin_obtener_tramite(
-    tramite_id: str, admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)
+    tramite_id: str, admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)
 ):
     with pool.connection() as conn:
+        _verificar_tramite_de_mi_organismo(conn, admin, tramite_id)
         snapshot = obtener_snapshot_vigente(conn, tramite_id)
         if snapshot is None:
             raise HTTPException(status_code=404, detail="Trámite no encontrado")
@@ -302,13 +322,17 @@ class TramitePayload(BaseModel):
 def admin_editar_tramite(
     tramite_id: str,
     request: TramitePayload,
-    admin_id: str = Depends(requiere_admin),
+    admin: AdminActual = Depends(requiere_admin),
     pool=Depends(obtener_pool),
     openai_client=Depends(obtener_openai_client),
 ):
     with pool.connection() as conn:
-        if obtener_snapshot_vigente(conn, tramite_id) is None:
+        _verificar_tramite_de_mi_organismo(conn, admin, tramite_id)
+        _verificar_payload_de_mi_organismo(conn, admin, request.organismo)
+
+        if admin.rol != "admin_organismo" and obtener_snapshot_vigente(conn, tramite_id) is None:
             raise HTTPException(status_code=404, detail="Trámite no encontrado")
+
         try:
             resultado = admin_tramite_editor.editar_tramite(
                 conn, tramite_id, request.model_dump(), openai_client.generate_embeddings
@@ -326,11 +350,12 @@ def admin_editar_tramite(
 @app.post("/admin/tramites")
 def admin_crear_tramite(
     request: TramitePayload,
-    admin_id: str = Depends(requiere_admin),
+    admin: AdminActual = Depends(requiere_admin),
     pool=Depends(obtener_pool),
     openai_client=Depends(obtener_openai_client),
 ):
     with pool.connection() as conn:
+        _verificar_payload_de_mi_organismo(conn, admin, request.organismo)
         try:
             resultado = admin_tramite_editor.crear_tramite(
                 conn, request.model_dump(), openai_client.generate_embeddings
