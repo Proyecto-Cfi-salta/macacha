@@ -2,7 +2,7 @@ import json
 import os
 import uuid
 from functools import lru_cache
-from typing import Iterator
+from typing import Iterator, Literal
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -368,3 +368,91 @@ def admin_crear_tramite(
                 detail="No se pudieron generar los embeddings. Verificá la configuración de OpenAI.",
             )
     return resultado
+
+
+class UsuarioPayload(BaseModel):
+    email: str = Field(min_length=1)
+    password: str = Field(min_length=8)
+    rol: Literal["super_admin", "admin_organismo"]
+    organismo_id: int | None = None
+
+
+class UsuarioEdicionPayload(BaseModel):
+    rol: Literal["super_admin", "admin_organismo"]
+    organismo_id: int | None = None
+    activo: bool
+    password: str | None = Field(default=None, min_length=8)
+
+
+class OrganismoPayload(BaseModel):
+    nombre: str = Field(min_length=1)
+
+
+def _validar_consistencia_rol_organismo(rol: str, organismo_id: int | None) -> None:
+    if rol == "admin_organismo" and organismo_id is None:
+        raise HTTPException(
+            status_code=400, detail="Un admin de organismo necesita un organismo asignado"
+        )
+    if rol == "super_admin" and organismo_id is not None:
+        raise HTTPException(
+            status_code=400, detail="Un super admin no puede tener un organismo asignado"
+        )
+
+
+@app.get("/admin/usuarios")
+def admin_listar_usuarios(
+    admin: AdminActual = Depends(requiere_super_admin), pool=Depends(obtener_pool)
+):
+    with pool.connection() as conn:
+        return admin_repository.listar_admins(conn)
+
+
+@app.post("/admin/usuarios")
+def admin_crear_usuario(
+    request: UsuarioPayload,
+    admin: AdminActual = Depends(requiere_super_admin),
+    pool=Depends(obtener_pool),
+):
+    _validar_consistencia_rol_organismo(request.rol, request.organismo_id)
+    password_hash = admin_security.hash_password(request.password)
+    with pool.connection() as conn:
+        if admin_repository.obtener_admin_por_email(conn, request.email) is not None:
+            raise HTTPException(status_code=409, detail="Ya existe un admin con ese email")
+        admin_repository.crear_admin(
+            conn, request.email, password_hash, request.rol, request.organismo_id
+        )
+        conn.commit()
+    return {"ok": True}
+
+
+@app.put("/admin/usuarios/{admin_id}")
+def admin_editar_usuario(
+    admin_id: uuid.UUID,
+    request: UsuarioEdicionPayload,
+    admin: AdminActual = Depends(requiere_super_admin),
+    pool=Depends(obtener_pool),
+):
+    _validar_consistencia_rol_organismo(request.rol, request.organismo_id)
+    password_hash = admin_security.hash_password(request.password) if request.password else None
+    with pool.connection() as conn:
+        if admin_repository.obtener_admin_por_id(conn, str(admin_id)) is None:
+            raise HTTPException(status_code=404, detail="Admin no encontrado")
+        admin_repository.editar_admin(
+            conn, str(admin_id), request.rol, request.organismo_id, request.activo, password_hash
+        )
+        conn.commit()
+    return {"ok": True}
+
+
+@app.post("/admin/organismos")
+def admin_crear_organismo(
+    request: OrganismoPayload,
+    admin: AdminActual = Depends(requiere_super_admin),
+    pool=Depends(obtener_pool),
+):
+    with pool.connection() as conn:
+        if admin_tramites_repository.obtener_organismo_id_por_nombre(conn, request.nombre) is not None:
+            raise HTTPException(status_code=409, detail="Ya existe un organismo con ese nombre")
+        organismo_id = admin_tramites_repository.crear_organismo(conn, request.nombre)
+        conn.commit()
+    return {"id": organismo_id, "nombre": request.nombre}
