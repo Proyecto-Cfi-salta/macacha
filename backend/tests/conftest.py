@@ -31,9 +31,9 @@ def clean_db():
             cur.execute("DELETE FROM sesiones")
             cur.execute("DELETE FROM tramite_chunks")
             cur.execute("DELETE FROM tramite_versiones")
+            cur.execute("DELETE FROM admins")
             cur.execute("DELETE FROM tramites")
             cur.execute("DELETE FROM organismos")
-            cur.execute("DELETE FROM admins")
 
     _clean()
     yield

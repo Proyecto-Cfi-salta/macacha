@@ -75,3 +75,13 @@ CREATE TABLE IF NOT EXISTS admins (
     password_hash TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+DO $$ BEGIN
+    CREATE TYPE admin_rol AS ENUM ('super_admin', 'admin_organismo');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE admins ADD COLUMN IF NOT EXISTS rol admin_rol NOT NULL DEFAULT 'admin_organismo';
+ALTER TABLE admins ADD COLUMN IF NOT EXISTS organismo_id INTEGER REFERENCES organismos(id);
+ALTER TABLE admins ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true;
