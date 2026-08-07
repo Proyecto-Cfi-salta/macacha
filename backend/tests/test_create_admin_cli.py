@@ -6,7 +6,7 @@ class _FakeConn:
         pass
 
 
-def test_main_crea_admin_con_password_hasheada(monkeypatch, capsys):
+def test_main_crea_admin_super_admin_con_password_hasheada(monkeypatch, capsys):
     llamada = {}
 
     monkeypatch.setattr(create_admin, "get_connection", lambda: _FakeConn())
@@ -14,15 +14,20 @@ def test_main_crea_admin_con_password_hasheada(monkeypatch, capsys):
         create_admin.security, "hash_password", lambda password: f"hash-de-{password}"
     )
 
-    def _fake_crear_admin(conn, email, password_hash):
+    def _fake_crear_admin(conn, email, password_hash, rol):
         llamada["email"] = email
         llamada["password_hash"] = password_hash
+        llamada["rol"] = rol
 
     monkeypatch.setattr(create_admin, "crear_admin", _fake_crear_admin)
 
     create_admin.main(["admin@macacha.gob.ar"], password_input=lambda prompt: "secreta123")
 
-    assert llamada == {"email": "admin@macacha.gob.ar", "password_hash": "hash-de-secreta123"}
+    assert llamada == {
+        "email": "admin@macacha.gob.ar",
+        "password_hash": "hash-de-secreta123",
+        "rol": "super_admin",
+    }
     assert "admin@macacha.gob.ar" in capsys.readouterr().out
 
 

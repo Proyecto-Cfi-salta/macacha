@@ -38,6 +38,14 @@ Guardá el resultado — se usa en el paso 4.
    psql "<connection-string-de-produccion>" -f backend/db/schema.sql
    ```
 
+5. Si es la primera vez que se aplica este cambio de schema (es decir, ya
+   había admins creados con la versión anterior), promové el admin
+   existente a super_admin:
+
+   ```bash
+   psql "<connection-string-de-produccion>" -c "UPDATE admins SET rol = 'super_admin' WHERE email = 'admin@macacha.gob.ar';"
+   ```
+
 ## 3. Push a GitHub
 
 Si todavía no existe el repo remoto, creá uno privado (desde la web de

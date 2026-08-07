@@ -19,10 +19,10 @@ def main(argv: list[str], password_input=getpass) -> None:
     password_hash = security.hash_password(password)
 
     conn = get_connection()
-    crear_admin(conn, email, password_hash)
+    crear_admin(conn, email, password_hash, "super_admin")
     conn.commit()
 
-    print(f"Admin creado: {email}")
+    print(f"Admin creado (super_admin): {email}")
 
 
 if __name__ == "__main__":
