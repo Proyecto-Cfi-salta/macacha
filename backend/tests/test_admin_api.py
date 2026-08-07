@@ -28,8 +28,10 @@ class _FakePool:
         return _FakeConnCtx(self._conn)
 
 
-def _crear_admin(conn, email="admin@macacha.gob.ar", password="secreta123"):
-    admin_repository.crear_admin(conn, email, admin_security.hash_password(password))
+def _crear_admin(
+    conn, email="admin@macacha.gob.ar", password="secreta123", rol="super_admin", organismo_id=None
+):
+    admin_repository.crear_admin(conn, email, admin_security.hash_password(password), rol, organismo_id)
     conn.commit()
     return email, password
 
@@ -46,7 +48,7 @@ def test_login_credenciales_validas_setea_cookie(db_conn, clean_db, monkeypatch)
         api.app.dependency_overrides.clear()
 
     assert respuesta.status_code == 200
-    assert respuesta.json() == {"email": email}
+    assert respuesta.json() == {"email": email, "rol": "super_admin", "organismo": None}
     assert "admin_session" in respuesta.cookies
 
 
@@ -79,6 +81,43 @@ def test_login_email_inexistente_devuelve_401(db_conn, clean_db, monkeypatch):
     assert respuesta.status_code == 401
 
 
+def test_login_admin_inactivo_devuelve_401(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    email, password = _crear_admin(db_conn)
+    admin_id = admin_repository.obtener_admin_por_email(db_conn, email)["id"]
+    admin_repository.editar_admin(db_conn, admin_id, rol="super_admin", organismo_id=None, activo=False)
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        respuesta = client.post("/admin/login", json={"email": email, "password": password})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 401
+
+
+def test_login_admin_organismo_devuelve_rol_y_organismo(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    with db_conn.cursor() as cur:
+        cur.execute("INSERT INTO organismos (nombre) VALUES ('Registro Civil') RETURNING id")
+        organismo_id = cur.fetchone()[0]
+    email, password = _crear_admin(
+        db_conn, rol="admin_organismo", organismo_id=organismo_id
+    )
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        respuesta = client.post("/admin/login", json={"email": email, "password": password})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == {"email": email, "rol": "admin_organismo", "organismo": "Registro Civil"}
+
+
 def test_me_sin_cookie_devuelve_401(db_conn, clean_db):
     api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
     client = TestClient(api.app, base_url="https://testserver")
@@ -103,7 +142,7 @@ def test_me_con_cookie_valida_devuelve_email(db_conn, clean_db, monkeypatch):
         api.app.dependency_overrides.clear()
 
     assert respuesta.status_code == 200
-    assert respuesta.json() == {"email": email}
+    assert respuesta.json() == {"email": email, "rol": "super_admin", "organismo": None}
 
 
 def test_logout_borra_la_cookie(db_conn, clean_db, monkeypatch):

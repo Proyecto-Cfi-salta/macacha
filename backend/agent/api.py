@@ -16,7 +16,7 @@ from agent.admin import repository as admin_repository
 from agent.admin import security as admin_security
 from agent.admin import tramite_editor as admin_tramite_editor
 from agent.admin import tramites_repository as admin_tramites_repository
-from agent.admin.dependencies import requiere_admin
+from agent.admin.dependencies import AdminActual, requiere_admin, requiere_super_admin
 from agent.chat_client import build_real_chat_client
 from agent.orchestrator import procesar_turno
 from db.pool import crear_pool
@@ -149,10 +149,21 @@ def admin_login(request: LoginRequest, response: Response, pool=Depends(obtener_
     with pool.connection() as conn:
         admin = admin_repository.obtener_admin_por_email(conn, request.email)
 
-    if admin is None or not admin_security.verify_password(request.password, admin["password_hash"]):
-        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+        if (
+            admin is None
+            or not admin["activo"]
+            or not admin_security.verify_password(request.password, admin["password_hash"])
+        ):
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    token = admin_security.crear_token(admin["id"])
+        organismo = (
+            admin_tramites_repository.obtener_nombre_organismo(conn, admin["organismo_id"])
+            if admin["organismo_id"] is not None
+            else None
+        )
+
+        token = admin_security.crear_token(admin)
+
     response.set_cookie(
         "admin_session",
         token,
@@ -161,7 +172,7 @@ def admin_login(request: LoginRequest, response: Response, pool=Depends(obtener_
         samesite="lax",
         max_age=86400,
     )
-    return {"email": admin["email"]}
+    return {"email": admin["email"], "rol": admin["rol"], "organismo": organismo}
 
 
 @app.post("/admin/logout")
@@ -171,13 +182,17 @@ def admin_logout(response: Response):
 
 
 @app.get("/admin/me")
-def admin_me(admin_id: str = Depends(requiere_admin), pool=Depends(obtener_pool)):
+def admin_me(admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)):
     with pool.connection() as conn:
-        admin = admin_repository.obtener_admin_por_id(conn, admin_id)
-
-    if admin is None:
-        raise HTTPException(status_code=401, detail="No autenticado")
-    return {"email": admin["email"]}
+        admin_db = admin_repository.obtener_admin_por_id(conn, admin.id)
+        if admin_db is None or not admin_db["activo"]:
+            raise HTTPException(status_code=401, detail="No autenticado")
+        organismo = (
+            admin_tramites_repository.obtener_nombre_organismo(conn, admin_db["organismo_id"])
+            if admin_db["organismo_id"] is not None
+            else None
+        )
+    return {"email": admin_db["email"], "rol": admin_db["rol"], "organismo": organismo}
 
 
 @app.get("/admin/sesiones")
