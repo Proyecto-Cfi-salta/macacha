@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TramiteForm } from "../../../../components/TramiteForm";
 import {
+  Organismo,
   crearTramite,
   listarOrganismos,
   type TramiteDetalleAdmin,
@@ -31,7 +32,7 @@ const VALORES_VACIOS: TramiteDetalleAdmin = {
 
 export default function NuevoTramitePage() {
   const router = useRouter();
-  const [organismos, setOrganismos] = useState<string[]>([]);
+  const [organismos, setOrganismos] = useState<Organismo[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

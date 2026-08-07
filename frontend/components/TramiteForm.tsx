@@ -3,24 +3,28 @@
 import { useState, type FormEvent } from "react";
 import { ListaFAQ } from "./ListaFAQ";
 import { ListaTextos } from "./ListaTextos";
-import type { TramiteDetalleAdmin } from "../lib/admin-tramites-api";
+import type { Organismo, TramiteDetalleAdmin } from "../lib/admin-tramites-api";
 
 export function TramiteForm({
   valoresIniciales,
   organismosExistentes,
+  organismoFijo,
   guardando,
   error,
   onGuardar,
 }: {
   valoresIniciales: TramiteDetalleAdmin;
-  organismosExistentes: string[];
+  organismosExistentes: Organismo[];
+  organismoFijo?: string;
   guardando: boolean;
   error: string | null;
   onGuardar: (datos: TramiteDetalleAdmin) => void;
 }) {
-  const [datos, setDatos] = useState<TramiteDetalleAdmin>(valoresIniciales);
+  const [datos, setDatos] = useState<TramiteDetalleAdmin>(
+    organismoFijo ? { ...valoresIniciales, organismo: organismoFijo } : valoresIniciales
+  );
   const [organismoEsNuevo, setOrganismoEsNuevo] = useState(
-    !organismosExistentes.includes(valoresIniciales.organismo)
+    !organismosExistentes.some((o) => o.nombre === valoresIniciales.organismo)
   );
 
   function actualizar<K extends keyof TramiteDetalleAdmin>(campo: K, valor: TramiteDetalleAdmin[K]) {
@@ -38,7 +42,14 @@ export function TramiteForm({
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-4 p-4">
       <div>
         <label className="mb-1 block text-sm font-medium">Organismo</label>
-        {organismoEsNuevo ? (
+        {organismoFijo ? (
+          <input
+            type="text"
+            value={organismoFijo}
+            disabled
+            className="w-full rounded border border-gray-300 bg-gray-100 px-2 py-1 text-sm text-gray-500"
+          />
+        ) : organismoEsNuevo ? (
           <input
             type="text"
             value={datos.organismo}
@@ -52,19 +63,21 @@ export function TramiteForm({
             className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
           >
             {organismosExistentes.map((organismo) => (
-              <option key={organismo} value={organismo}>
-                {organismo}
+              <option key={organismo.id} value={organismo.nombre}>
+                {organismo.nombre}
               </option>
             ))}
           </select>
         )}
-        <button
-          type="button"
-          onClick={() => setOrganismoEsNuevo(!organismoEsNuevo)}
-          className="mt-1 text-sm text-blue-700 underline"
-        >
-          {organismoEsNuevo ? "Elegir uno existente" : "Otro… (crear nuevo)"}
-        </button>
+        {!organismoFijo && (
+          <button
+            type="button"
+            onClick={() => setOrganismoEsNuevo(!organismoEsNuevo)}
+            className="mt-1 text-sm text-blue-700 underline"
+          >
+            {organismoEsNuevo ? "Elegir uno existente" : "Otro… (crear nuevo)"}
+          </button>
+        )}
       </div>
 
       <div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { TramiteForm } from "../../../../components/TramiteForm";
 import {
+  Organismo,
   editarTramite,
   listarOrganismos,
   obtenerTramiteAdmin,
@@ -12,7 +13,7 @@ import {
 
 export default function EditarTramitePage() {
   const params = useParams<{ id: string }>();
-  const [organismos, setOrganismos] = useState<string[]>([]);
+  const [organismos, setOrganismos] = useState<Organismo[]>([]);
   const [tramite, setTramite] = useState<TramiteDetalleAdmin | null | undefined>(undefined);
   const [cargandoError, setCargandoError] = useState(false);
   const [guardando, setGuardando] = useState(false);

@@ -1,5 +1,7 @@
 export type Faq = { pregunta: string; respuesta: string };
 
+export type Organismo = { id: number; nombre: string };
+
 export type TramiteResumen = {
   id: string;
   nombre_oficial: string;
@@ -47,7 +49,7 @@ export async function listarTramites(): Promise<TramiteResumen[]> {
   return respuesta.json();
 }
 
-export async function listarOrganismos(): Promise<string[]> {
+export async function listarOrganismos(): Promise<Organismo[]> {
   const respuesta = await fetch(`${BASE_URL}/admin/organismos`, {
     credentials: "include",
   });
