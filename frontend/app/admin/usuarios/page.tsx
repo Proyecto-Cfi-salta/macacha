@@ -138,6 +138,7 @@ export default function UsuariosPage() {
       {editando && (
         <div className="mb-4">
           <UsuarioForm
+            key={editando === "nuevo" ? "nuevo" : editando.id}
             valoresIniciales={editando === "nuevo" ? VALORES_VACIOS : valoresParaEditar(editando)}
             organismos={organismos}
             esEdicion={editando !== "nuevo"}
