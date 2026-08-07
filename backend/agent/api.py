@@ -199,23 +199,35 @@ def admin_me(admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_
 def admin_listar_sesiones(
     page: int = 1,
     page_size: int = 20,
-    admin_id: str = Depends(requiere_admin),
+    admin: AdminActual = Depends(requiere_admin),
     pool=Depends(obtener_pool),
 ):
     with pool.connection() as conn:
-        sesiones = admin_chats_repository.listar_sesiones(conn, page, page_size)
-        total = admin_chats_repository.contar_sesiones(conn)
+        if admin.rol == "admin_organismo":
+            sesiones, total = admin_chats_repository.listar_sesiones_de_organismo(
+                conn, admin.organismo_id, page, page_size
+            )
+        else:
+            sesiones = admin_chats_repository.listar_sesiones(conn, page, page_size)
+            total = admin_chats_repository.contar_sesiones(conn)
     return {"sesiones": sesiones, "total": total, "page": page, "page_size": page_size}
 
 
 @app.get("/admin/sesiones/{session_id}")
 def admin_obtener_sesion(
     session_id: uuid.UUID,
-    admin_id: str = Depends(requiere_admin),
+    admin: AdminActual = Depends(requiere_admin),
     pool=Depends(obtener_pool),
 ):
     with pool.connection() as conn:
-        if not admin_chats_repository.sesion_existe(conn, str(session_id)):
+        if admin.rol == "admin_organismo":
+            permitido = admin_chats_repository.sesion_pertenece_a_organismo(
+                conn, str(session_id), admin.organismo_id
+            )
+        else:
+            permitido = admin_chats_repository.sesion_existe(conn, str(session_id))
+
+        if not permitido:
             raise HTTPException(status_code=404, detail="Sesión no encontrada")
         return admin_chats_repository.obtener_mensajes_completos(conn, str(session_id))
 

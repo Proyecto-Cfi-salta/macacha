@@ -229,3 +229,146 @@ def test_obtener_sesion_devuelve_los_mensajes_completos(db_conn, clean_db, monke
 
     assert respuesta.status_code == 200
     assert respuesta.json()[0]["rol"] == "user"
+
+
+def _crear_admin_organismo(conn, organismo_id, email="org@macacha.gob.ar", password="secreta123"):
+    admin_repository.crear_admin(
+        conn, email, admin_security.hash_password(password), rol="admin_organismo", organismo_id=organismo_id
+    )
+    conn.commit()
+    return email, password
+
+
+def _crear_organismo(conn, nombre):
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO organismos (nombre) VALUES (%s) RETURNING id", (nombre,))
+        return cur.fetchone()[0]
+
+
+def _crear_tramite(conn, tramite_id, organismo_id):
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO tramites (id, organismo_id, categoria, nombre_oficial) VALUES (%s, %s, '', %s)",
+            (tramite_id, organismo_id, tramite_id),
+        )
+
+
+def test_listar_sesiones_admin_organismo_solo_ve_las_de_su_organismo(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    organismo_propio = _crear_organismo(db_conn, "Registro Civil")
+    organismo_ajeno = _crear_organismo(db_conn, "Rentas")
+    _crear_tramite(db_conn, "RC-0001", organismo_propio)
+    _crear_tramite(db_conn, "RE-0001", organismo_ajeno)
+
+    sesion_propia = str(uuid.uuid4())
+    sesion_ajena = str(uuid.uuid4())
+    sessions.crear_sesion_si_no_existe(db_conn, sesion_propia)
+    sessions.crear_sesion_si_no_existe(db_conn, sesion_ajena)
+    sessions.guardar_mensaje(
+        db_conn,
+        sesion_propia,
+        rol="assistant",
+        tool_calls=[
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "obtener_requisitos", "arguments": '{"tramite_id": "RC-0001"}'},
+            }
+        ],
+    )
+    sessions.guardar_mensaje(
+        db_conn,
+        sesion_ajena,
+        rol="assistant",
+        tool_calls=[
+            {
+                "id": "call_2",
+                "type": "function",
+                "function": {"name": "obtener_requisitos", "arguments": '{"tramite_id": "RE-0001"}'},
+            }
+        ],
+    )
+    db_conn.commit()
+
+    email, password = _crear_admin_organismo(db_conn, organismo_propio)
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        client.post("/admin/login", json={"email": email, "password": password})
+        respuesta = client.get("/admin/sesiones?page=1&page_size=20")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    cuerpo = respuesta.json()
+    assert cuerpo["total"] == 1
+    assert [s["id"] for s in cuerpo["sesiones"]] == [sesion_propia]
+
+
+def test_obtener_sesion_admin_organismo_sesion_ajena_devuelve_404(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    organismo_propio = _crear_organismo(db_conn, "Registro Civil")
+    organismo_ajeno = _crear_organismo(db_conn, "Rentas")
+    _crear_tramite(db_conn, "RE-0001", organismo_ajeno)
+
+    sesion_ajena = str(uuid.uuid4())
+    sessions.crear_sesion_si_no_existe(db_conn, sesion_ajena)
+    sessions.guardar_mensaje(
+        db_conn,
+        sesion_ajena,
+        rol="assistant",
+        tool_calls=[
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "obtener_requisitos", "arguments": '{"tramite_id": "RE-0001"}'},
+            }
+        ],
+    )
+    db_conn.commit()
+
+    email, password = _crear_admin_organismo(db_conn, organismo_propio)
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        client.post("/admin/login", json={"email": email, "password": password})
+        respuesta = client.get(f"/admin/sesiones/{sesion_ajena}")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 404
+
+
+def test_obtener_sesion_admin_organismo_sesion_propia_devuelve_200(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    organismo_propio = _crear_organismo(db_conn, "Registro Civil")
+    _crear_tramite(db_conn, "RC-0001", organismo_propio)
+
+    sesion_propia = str(uuid.uuid4())
+    sessions.crear_sesion_si_no_existe(db_conn, sesion_propia)
+    sessions.guardar_mensaje(
+        db_conn,
+        sesion_propia,
+        rol="assistant",
+        tool_calls=[
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "obtener_requisitos", "arguments": '{"tramite_id": "RC-0001"}'},
+            }
+        ],
+    )
+    db_conn.commit()
+
+    email, password = _crear_admin_organismo(db_conn, organismo_propio)
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        client.post("/admin/login", json={"email": email, "password": password})
+        respuesta = client.get(f"/admin/sesiones/{sesion_propia}")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
