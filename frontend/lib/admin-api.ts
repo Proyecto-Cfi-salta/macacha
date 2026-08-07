@@ -28,7 +28,23 @@ export type ListaSesiones = {
   page_size: number;
 };
 
+export type AdminSesionInfo = {
+  email: string;
+  rol: "super_admin" | "admin_organismo";
+  organismo: string | null;
+};
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+export async function obtenerMe(): Promise<AdminSesionInfo | null> {
+  const respuesta = await fetch(`${BASE_URL}/admin/me`, {
+    credentials: "include",
+  });
+  if (!respuesta.ok) {
+    return null;
+  }
+  return respuesta.json();
+}
 
 export async function login(
   email: string,
