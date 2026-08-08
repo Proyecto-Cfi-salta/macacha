@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminActual } from "../../../../hooks/useAdminActual";
 import { TramiteForm } from "../../../../components/TramiteForm";
 import {
   Organismo,
@@ -32,6 +33,7 @@ const VALORES_VACIOS: TramiteDetalleAdmin = {
 
 export default function NuevoTramitePage() {
   const router = useRouter();
+  const admin = useAdminActual();
   const [organismos, setOrganismos] = useState<Organismo[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export default function NuevoTramitePage() {
     <TramiteForm
       valoresIniciales={VALORES_VACIOS}
       organismosExistentes={organismos}
+      organismoFijo={admin?.rol === "admin_organismo" ? admin.organismo ?? undefined : undefined}
       guardando={guardando}
       error={error}
       onGuardar={handleGuardar}
