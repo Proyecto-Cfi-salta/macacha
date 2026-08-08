@@ -30,8 +30,12 @@ def decodificar_token(token: str) -> dict | None:
         payload = jwt.decode(token, os.environ["ADMIN_JWT_SECRET"], algorithms=["HS256"])
     except jwt.PyJWTError:
         return None
-    return {
-        "sub": payload.get("sub"),
-        "rol": payload.get("rol"),
-        "organismo_id": payload.get("organismo_id"),
-    }
+
+    rol = payload.get("rol")
+    organismo_id = payload.get("organismo_id")
+    if rol not in ("super_admin", "admin_organismo"):
+        return None
+    if rol == "admin_organismo" and organismo_id is None:
+        return None
+
+    return {"sub": payload.get("sub"), "rol": rol, "organismo_id": organismo_id}

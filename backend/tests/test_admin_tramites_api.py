@@ -588,3 +588,120 @@ def test_crear_tramite_admin_organismo_puede_crear_para_su_organismo(db_conn, cl
         api.app.dependency_overrides.clear()
 
     assert respuesta.status_code == 200
+
+
+def test_obtener_tramite_admin_organismo_devuelve_snapshot_de_su_propio_tramite(
+    db_conn, clean_db, monkeypatch
+):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    organismo_propio = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_propio, "Actas", "Actas Regulares")
+    snapshot = {
+        "id": "RC-0001",
+        "organismo": "Registro Civil",
+        "categoria": "Actas",
+        "nombre_oficial": "Actas Regulares",
+        "descripcion": "desc",
+        "objetivo": "obj",
+        "requisitos": ["DNI"],
+        "pasos": [],
+        "costo": "",
+        "modalidad": "",
+        "duracion": "",
+        "telefono_contacto": "",
+        "email_contacto": "",
+        "problemas_frecuentes": [],
+        "sinonimos": [],
+        "keywords": [],
+        "enlaces_oficiales": [],
+        "preguntas_frecuentes": [],
+        "faq_generadas_automaticamente": False,
+    }
+    chunks = [{"tipo_chunk": "descripcion", "texto": "texto", "fuente_url": None}]
+    repo.insert_version_with_chunks(db_conn, "RC-0001", 1, "hash-1", snapshot, chunks, [[0.0] * 1536])
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        _crear_admin_y_loguear(
+            client, db_conn, rol="admin_organismo", organismo_id=organismo_propio
+        )
+        respuesta = client.get("/admin/tramites/RC-0001")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert cuerpo["nombre_oficial"] == "Actas Regulares"
+    assert cuerpo["requisitos"] == ["DNI"]
+
+
+def test_editar_tramite_admin_organismo_exitoso_crea_version_nueva(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    organismo_propio = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_propio, "Actas", "Actas Regulares")
+    snapshot = {
+        "id": "RC-0001",
+        "organismo": "Registro Civil",
+        "categoria": "Actas",
+        "nombre_oficial": "Actas Regulares",
+        "descripcion": "",
+        "objetivo": "",
+        "requisitos": ["DNI"],
+        "pasos": [],
+        "costo": "Gratis",
+        "modalidad": "",
+        "duracion": "",
+        "telefono_contacto": "",
+        "email_contacto": "",
+        "problemas_frecuentes": [],
+        "sinonimos": [],
+        "keywords": [],
+        "enlaces_oficiales": [],
+        "preguntas_frecuentes": [],
+        "faq_generadas_automaticamente": False,
+    }
+    chunks = [{"tipo_chunk": "descripcion", "texto": "texto", "fuente_url": None}]
+    repo.insert_version_with_chunks(
+        db_conn, "RC-0001", 1, compute_content_hash(snapshot), snapshot, chunks, [[0.0] * 1536]
+    )
+    db_conn.commit()
+
+    payload = _payload_edicion(costo="Con costo")
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    api.app.dependency_overrides[api.obtener_openai_client] = lambda: _FakeOpenAIClient()
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        _crear_admin_y_loguear(
+            client, db_conn, rol="admin_organismo", organismo_id=organismo_propio
+        )
+        respuesta = client.put("/admin/tramites/RC-0001", json=payload)
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == {"tramite_id": "RC-0001", "numero_version": 2, "cambios": True}
+
+
+def test_editar_tramite_admin_organismo_sin_version_vigente_devuelve_404(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    organismo_propio = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_propio, "Actas", "Actas Regulares")
+    db_conn.commit()
+
+    payload = _payload_edicion()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    api.app.dependency_overrides[api.obtener_openai_client] = lambda: _FakeOpenAIClient()
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        _crear_admin_y_loguear(
+            client, db_conn, rol="admin_organismo", organismo_id=organismo_propio
+        )
+        respuesta = client.put("/admin/tramites/RC-0001", json=payload)
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 404

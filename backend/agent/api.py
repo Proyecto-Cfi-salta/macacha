@@ -330,7 +330,7 @@ def admin_editar_tramite(
         _verificar_tramite_de_mi_organismo(conn, admin, tramite_id)
         _verificar_payload_de_mi_organismo(conn, admin, request.organismo)
 
-        if admin.rol != "admin_organismo" and obtener_snapshot_vigente(conn, tramite_id) is None:
+        if obtener_snapshot_vigente(conn, tramite_id) is None:
             raise HTTPException(status_code=404, detail="Trámite no encontrado")
 
         try:

@@ -20,9 +20,7 @@ export function TramiteForm({
   error: string | null;
   onGuardar: (datos: TramiteDetalleAdmin) => void;
 }) {
-  const [datos, setDatos] = useState<TramiteDetalleAdmin>(
-    organismoFijo ? { ...valoresIniciales, organismo: organismoFijo } : valoresIniciales
-  );
+  const [datos, setDatos] = useState<TramiteDetalleAdmin>(valoresIniciales);
   const [organismoEsNuevo, setOrganismoEsNuevo] = useState(
     !organismosExistentes.some((o) => o.nombre === valoresIniciales.organismo)
   );
@@ -33,10 +31,11 @@ export function TramiteForm({
 
   function handleSubmit(evento: FormEvent) {
     evento.preventDefault();
-    onGuardar(datos);
+    onGuardar(organismoFijo ? { ...datos, organismo: organismoFijo } : datos);
   }
 
-  const puedeGuardar = datos.organismo.trim() !== "" && datos.nombre_oficial.trim() !== "";
+  const organismoEfectivo = organismoFijo ?? datos.organismo;
+  const puedeGuardar = organismoEfectivo.trim() !== "" && datos.nombre_oficial.trim() !== "";
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-4 p-4">

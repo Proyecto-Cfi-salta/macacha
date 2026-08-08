@@ -74,3 +74,47 @@ def test_decodificar_token_firmado_con_otro_secreto_devuelve_none(monkeypatch):
         algorithm="HS256",
     )
     assert security.decodificar_token(token_ajeno) is None
+
+
+def test_decodificar_token_sin_rol_devuelve_none(monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    token_sin_rol = jwt.encode(
+        {
+            "sub": "admin-1",
+            "organismo_id": 1,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        },
+        "secreto-de-test",
+        algorithm="HS256",
+    )
+    assert security.decodificar_token(token_sin_rol) is None
+
+
+def test_decodificar_token_con_rol_invalido_devuelve_none(monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    token_rol_invalido = jwt.encode(
+        {
+            "sub": "admin-1",
+            "rol": "editor",
+            "organismo_id": 1,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        },
+        "secreto-de-test",
+        algorithm="HS256",
+    )
+    assert security.decodificar_token(token_rol_invalido) is None
+
+
+def test_decodificar_token_admin_organismo_sin_organismo_id_devuelve_none(monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    token_sin_organismo = jwt.encode(
+        {
+            "sub": "admin-1",
+            "rol": "admin_organismo",
+            "organismo_id": None,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        },
+        "secreto-de-test",
+        algorithm="HS256",
+    )
+    assert security.decodificar_token(token_sin_organismo) is None
