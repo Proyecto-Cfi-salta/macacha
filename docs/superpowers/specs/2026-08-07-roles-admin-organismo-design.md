@@ -128,6 +128,23 @@ def requiere_super_admin(admin: AdminActual = Depends(requiere_admin)) -> AdminA
 Todos los endpoints que hoy reciben `admin_id: str = Depends(requiere_admin)`
 pasan a recibir `admin: AdminActual = Depends(requiere_admin)`.
 
+**Limitación conocida y aceptada — revocación no es inmediata en la API.**
+`requiere_admin` lee `rol`/`organismo_id`/`activo` únicamente del JWT, sin
+consultar la base en cada request (por diseño, para no pagar una query en
+cada llamada al panel admin). Solo `GET /admin/me` — que el middleware del
+frontend llama en cada navegación a `/admin/*` — vuelve a consultar la DB y
+aplica el chequeo de `activo`. Consecuencia: desactivar un admin, o cambiarle
+el rol/organismo, no tiene efecto sobre una cookie de sesión ya emitida
+hasta que esta expira (máximo 24hs) o hasta que el frontend la fuerza a
+re-loguearse vía `/admin/me`. Un acceso directo a la API (sin pasar por la
+UI) con una cookie retenida de una cuenta recién desactivada sigue
+funcionando durante esa ventana. Aceptado conscientemente: el panel admin es
+de bajo tráfico y pocos usuarios internos: el costo de una consulta a la DB
+en cada request no se justifica frente a este riesgo. Si el perfil de uso
+cambiara, la mitigación es hacer que `requiere_admin` resuelva `rol`/
+`organismo_id`/`activo` desde la DB (como ya hace `/admin/me`), reduciendo el
+JWT a una simple aserción de identidad — no forma parte de este trabajo.
+
 ### Regla de acceso cross-organismo
 
 Para cualquier endpoint que accede a un recurso (trámite o sesión) por id:
