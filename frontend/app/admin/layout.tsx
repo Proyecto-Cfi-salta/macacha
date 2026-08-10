@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { logout } from "../../lib/admin-api";
 import { AdminAuthProvider, useAdminActual } from "../../hooks/useAdminActual";
 
@@ -15,7 +15,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const admin = useAdminActual();
+
+  if (pathname === "/admin/login") {
+    return <>{children}</>;
+  }
 
   async function handleLogout() {
     await logout();
