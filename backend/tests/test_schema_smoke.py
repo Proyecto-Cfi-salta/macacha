@@ -19,6 +19,7 @@ def test_extension_and_tables_exist(db_conn):
             "sesiones",
             "mensajes",
             "admins",
+            "solicitudes_contacto",
         } <= tables
 
 

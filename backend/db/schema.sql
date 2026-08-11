@@ -85,3 +85,16 @@ END $$;
 ALTER TABLE admins ADD COLUMN IF NOT EXISTS rol admin_rol NOT NULL DEFAULT 'admin_organismo';
 ALTER TABLE admins ADD COLUMN IF NOT EXISTS organismo_id INTEGER REFERENCES organismos(id);
 ALTER TABLE admins ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true;
+
+CREATE TABLE IF NOT EXISTS solicitudes_contacto (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES sesiones(id),
+    tramite_id TEXT REFERENCES tramites(id),
+    organismo_id INTEGER REFERENCES organismos(id),
+    nombre TEXT NOT NULL,
+    email TEXT NOT NULL,
+    telefono TEXT NOT NULL,
+    consulta TEXT NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'pendiente',
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
