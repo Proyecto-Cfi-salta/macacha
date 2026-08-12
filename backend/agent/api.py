@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import uuid
 from functools import lru_cache
@@ -30,6 +31,8 @@ from ingest.repository import (
 )
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 if not os.environ.get("ADMIN_JWT_SECRET"):
     raise RuntimeError(
@@ -170,15 +173,18 @@ def _armar_cuerpo_mail(request: ContactoPayload, mensajes: list[dict]) -> str:
 def crear_solicitud_contacto(request: ContactoPayload, pool=Depends(obtener_pool)):
     with pool.connection() as conn:
         sessions.crear_sesion_si_no_existe(conn, str(request.session_id))
-        organismo_id = (
-            admin_tramites_repository.obtener_organismo_id_de_tramite(conn, request.tramite_id)
-            if request.tramite_id
-            else None
-        )
-        contacto_repository.crear_solicitud(
+
+        tramite_id = request.tramite_id
+        organismo_id = None
+        if tramite_id:
+            organismo_id = admin_tramites_repository.obtener_organismo_id_de_tramite(conn, tramite_id)
+            if organismo_id is None:
+                tramite_id = None  # trámite desconocido -> tratamos como "sin trámite"
+
+        solicitud_id = contacto_repository.crear_solicitud(
             conn,
             str(request.session_id),
-            request.tramite_id,
+            tramite_id,
             organismo_id,
             request.nombre,
             request.email,
@@ -197,7 +203,7 @@ def crear_solicitud_contacto(request: ContactoPayload, pool=Depends(obtener_pool
             cuerpo_texto=_armar_cuerpo_mail(request, mensajes),
         )
     except Exception:
-        pass  # best-effort: la solicitud ya está guardada y visible en /admin/contacto
+        logger.exception("Falló el envío de mail de contacto para la solicitud %s", solicitud_id)
 
     return {"ok": True}
 

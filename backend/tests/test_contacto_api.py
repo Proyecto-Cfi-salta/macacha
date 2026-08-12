@@ -122,6 +122,32 @@ def test_post_contacto_crea_sesion_si_no_existe(db_conn, clean_db):
         assert cur.fetchone()[0] == 1
 
 
+def test_post_contacto_con_tramite_inexistente_no_falla(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    sessions.crear_sesion_si_no_existe(db_conn, session_id)
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        with patch("agent.api.mail.enviar_mail"):
+            respuesta = client.post(
+                "/contacto", json=_payload(session_id, tramite_id="NO-EXISTE-9999")
+            )
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == {"ok": True}
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT tramite_id, organismo_id FROM solicitudes_contacto WHERE session_id = %s",
+            (session_id,),
+        )
+        fila = cur.fetchone()
+        assert fila == (None, None)
+
+
 def test_post_contacto_campo_faltante_devuelve_422(db_conn, clean_db):
     session_id = str(uuid.uuid4())
 

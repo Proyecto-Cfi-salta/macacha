@@ -21,7 +21,7 @@ def test_enviar_mail_usa_configuracion_del_entorno(monkeypatch):
             cuerpo_texto="Hola, tengo una consulta.",
         )
 
-    smtp_cls.assert_called_once_with("smtp.ejemplo.com", 587)
+    smtp_cls.assert_called_once_with("smtp.ejemplo.com", 587, timeout=10)
     smtp_instance.starttls.assert_called_once()
     smtp_instance.login.assert_called_once_with("usuario@ejemplo.com", "secreta")
 
