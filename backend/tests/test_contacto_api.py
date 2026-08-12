@@ -99,6 +99,29 @@ def test_post_contacto_persiste_aunque_el_mail_falle(db_conn, clean_db):
         assert cur.fetchone()[0] == 1
 
 
+def test_post_contacto_crea_sesion_si_no_existe(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    # A propósito NO se llama a sessions.crear_sesion_si_no_existe ni se
+    # inserta en `sesiones`: reproduce el caso del botón "¿Necesitás hablar
+    # con una persona?" clickeado antes de enviar ningún mensaje de chat.
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        with patch("agent.api.mail.enviar_mail") as enviar_mail_mock:
+            respuesta = client.post("/contacto", json=_payload(session_id))
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == {"ok": True}
+    enviar_mail_mock.assert_called_once()
+
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM sesiones WHERE id = %s", (session_id,))
+        assert cur.fetchone()[0] == 1
+
+
 def test_post_contacto_campo_faltante_devuelve_422(db_conn, clean_db):
     session_id = str(uuid.uuid4())
 

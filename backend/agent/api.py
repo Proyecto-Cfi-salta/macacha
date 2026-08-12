@@ -169,6 +169,7 @@ def _armar_cuerpo_mail(request: ContactoPayload, mensajes: list[dict]) -> str:
 @app.post("/contacto")
 def crear_solicitud_contacto(request: ContactoPayload, pool=Depends(obtener_pool)):
     with pool.connection() as conn:
+        sessions.crear_sesion_si_no_existe(conn, str(request.session_id))
         organismo_id = (
             admin_tramites_repository.obtener_organismo_id_de_tramite(conn, request.tramite_id)
             if request.tramite_id
