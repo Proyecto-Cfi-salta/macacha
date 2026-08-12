@@ -57,7 +57,12 @@ SYSTEM_PROMPT = (
     "herramienta buscar_tramite devuelve varios trámites candidatos y no está "
     "claro cuál necesita la persona, preguntá con calidez para desambiguar "
     "antes de usar las demás herramientas. Cuando menciones un trámite, usá su "
-    "nombre oficial."
+    "nombre oficial. "
+    "Si en algún momento no podés resolver la consulta con la información "
+    "disponible, o la persona te dice que la respuesta no le sirve o que "
+    "necesita hablar con alguien, usá la herramienta ofrecer_contacto_humano "
+    "y después invitala con calidez a completar el formulario de contacto "
+    "que va a aparecer."
 )
 
 MAX_ITERACIONES_TOOLS = 5
@@ -77,6 +82,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
 
     tramites_citados: list[str] = []
     candidatos_buscados: dict[str, str] = {}
+    sugerir_contacto = False
 
     for _ in range(MAX_ITERACIONES_TOOLS):
         contenido = ""
@@ -106,6 +112,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
                 "candidatos_ambiguos": (
                     [] if tramites_citados else _armar_candidatos_ambiguos(conn, candidatos_buscados)
                 ),
+                "sugerir_contacto": sugerir_contacto,
             }
             return
 
@@ -129,6 +136,9 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
             nombre = tool_call["function"]["name"]
             argumentos = json.loads(tool_call["function"]["arguments"])
             resultado = ejecutar_tool(nombre, argumentos, conn, embed_fn, rerank_fn)
+
+            if nombre == "ofrecer_contacto_humano":
+                sugerir_contacto = True
 
             if "tramite_id" in argumentos and argumentos["tramite_id"] not in tramites_citados:
                 tramites_citados.append(argumentos["tramite_id"])
@@ -158,6 +168,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
         "candidatos_ambiguos": (
             [] if tramites_citados else _armar_candidatos_ambiguos(conn, candidatos_buscados)
         ),
+        "sugerir_contacto": True,
     }
 
 

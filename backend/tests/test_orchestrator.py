@@ -67,7 +67,12 @@ def test_procesar_turno_sin_tool_calls(db_conn, clean_db):
 
     texto = "".join(e["delta"] for e in eventos if e["tipo"] == "texto")
     assert texto.strip() == "Hola, en qué te ayudo?"
-    assert eventos[-1] == {"tipo": "fin", "fuentes": [], "candidatos_ambiguos": []}
+    assert eventos[-1] == {
+        "tipo": "fin",
+        "fuentes": [],
+        "candidatos_ambiguos": [],
+        "sugerir_contacto": False,
+    }
 
 
 def test_procesar_turno_con_tool_call_arma_fuentes(db_conn, clean_db):
@@ -124,6 +129,7 @@ def test_procesar_turno_con_tool_call_arma_fuentes(db_conn, clean_db):
             }
         ],
         "candidatos_ambiguos": [],
+        "sugerir_contacto": False,
     }
 
 
@@ -223,6 +229,7 @@ def test_procesar_turno_busqueda_con_match_unico_cita_la_fuente(db_conn, clean_d
             }
         ],
         "candidatos_ambiguos": [],
+        "sugerir_contacto": False,
     }
 
 
@@ -422,7 +429,12 @@ def test_procesar_turno_busqueda_sin_resultados_no_cita_fuentes(db_conn, clean_d
     )
     db_conn.commit()
 
-    assert eventos[-1] == {"tipo": "fin", "fuentes": [], "candidatos_ambiguos": []}
+    assert eventos[-1] == {
+        "tipo": "fin",
+        "fuentes": [],
+        "candidatos_ambiguos": [],
+        "sugerir_contacto": False,
+    }
 
 
 def test_procesar_turno_persiste_los_mensajes_visibles(db_conn, clean_db):
@@ -452,3 +464,71 @@ def test_procesar_turno_persiste_el_proveedor_del_chat_client(db_conn, clean_db)
             (session_id,),
         )
         assert cur.fetchone()[0] == "gemini"
+
+
+def test_procesar_turno_tool_ofrecer_contacto_humano_marca_sugerir_contacto(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    chat_client = _FakeChatClient(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "ofrecer_contacto_humano", "arguments": "{}"},
+                    }
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": "¿Querés que te ayude una persona? Completá este formulario.",
+                "tool_calls": None,
+            },
+        ]
+    )
+
+    eventos = list(
+        procesar_turno(db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "no entiendo nada")
+    )
+    db_conn.commit()
+
+    assert eventos[-1]["sugerir_contacto"] is True
+
+
+def test_procesar_turno_agotar_iteraciones_marca_sugerir_contacto(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    respuesta_con_tool_call_infinita = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": "call_x",
+                "type": "function",
+                "function": {"name": "buscar_tramite", "arguments": '{"query": "algo"}'},
+            }
+        ],
+    }
+    chat_client = _FakeChatClient([respuesta_con_tool_call_infinita] * 6)
+
+    eventos = list(
+        procesar_turno(db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "hola")
+    )
+    db_conn.commit()
+
+    assert eventos[-1]["sugerir_contacto"] is True
+
+
+def test_procesar_turno_normal_no_marca_sugerir_contacto(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    chat_client = _FakeChatClient(
+        [{"role": "assistant", "content": "Hola, en qué te ayudo?", "tool_calls": None}]
+    )
+
+    eventos = list(
+        procesar_turno(db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "hola")
+    )
+    db_conn.commit()
+
+    assert eventos[-1]["sugerir_contacto"] is False
