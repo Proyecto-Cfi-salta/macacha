@@ -136,4 +136,21 @@ def test_tool_schemas_tiene_los_7_nombres_esperados():
         "obtener_normativa",
         "obtener_formularios_enlaces",
         "obtener_problemas_frecuentes",
+        "ofrecer_contacto_humano",
     }
+
+
+def test_ofrecer_contacto_humano_devuelve_sugerido():
+    assert tools.ofrecer_contacto_humano() == {"sugerido": True}
+
+
+def test_ejecutar_tool_ofrecer_contacto_humano(db_conn, clean_db):
+    resultado = tools.ejecutar_tool(
+        "ofrecer_contacto_humano", {}, db_conn, _fake_embed_fn, _fake_rerank_fn
+    )
+    assert resultado == {"sugerido": True}
+
+
+def test_ofrecer_contacto_humano_esta_en_tool_schemas():
+    nombres = [t["function"]["name"] for t in tools.TOOL_SCHEMAS]
+    assert "ofrecer_contacto_humano" in nombres

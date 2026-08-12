@@ -109,6 +109,20 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "ofrecer_contacto_humano",
+            "description": (
+                "Usala cuando no puedas resolver la consulta de la persona — no "
+                "encontrás el trámite, la información no alcanza, o la persona te "
+                "dice explícitamente que la respuesta no le sirve o que necesita "
+                "hablar con alguien. No la uses como primera opción: intentá "
+                "resolver la consulta primero."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
 ]
 
 
@@ -168,6 +182,10 @@ def obtener_problemas_frecuentes(conn, tramite_id: str) -> list[str]:
     return snapshot["problemas_frecuentes"] if snapshot else []
 
 
+def ofrecer_contacto_humano() -> dict:
+    return {"sugerido": True}
+
+
 def ejecutar_tool(nombre: str, argumentos: dict, conn, embed_fn, rerank_fn):
     if nombre == "buscar_tramite":
         return buscar_tramite(conn, embed_fn, rerank_fn, argumentos["query"])
@@ -183,4 +201,6 @@ def ejecutar_tool(nombre: str, argumentos: dict, conn, embed_fn, rerank_fn):
         return obtener_formularios_enlaces(conn, argumentos["tramite_id"])
     if nombre == "obtener_problemas_frecuentes":
         return obtener_problemas_frecuentes(conn, argumentos["tramite_id"])
+    if nombre == "ofrecer_contacto_humano":
+        return ofrecer_contacto_humano()
     raise ValueError(f"Tool desconocida: {nombre}")
