@@ -30,9 +30,11 @@ Guardá el resultado — se usa en el paso 4.
    necesita la extensión pgvector).
 3. Una vez creada, copiar la connection string interna que da Dokploy
    (la vas a necesitar en el paso 4).
-4. Aplicar el esquema una sola vez, desde tu máquina (necesita conexión
-   de red hacia la base — Dokploy suele tener una opción para exponer el
-   puerto temporalmente):
+4. Aplicar el esquema por primera vez, desde tu máquina (necesita
+   conexión de red hacia la base — Dokploy suele tener una opción para
+   exponer el puerto temporalmente). Este mismo comando hay que volverlo
+   a correr más adelante cada vez que `schema.sql` cambie — ver la nota
+   del punto 6:
 
    ```bash
    psql "<connection-string-de-produccion>" -f backend/db/schema.sql
@@ -45,6 +47,25 @@ Guardá el resultado — se usa en el paso 4.
    ```bash
    psql "<connection-string-de-produccion>" -c "UPDATE admins SET rol = 'super_admin' WHERE email = 'admin@macacha.gob.ar';"
    ```
+
+6. **Instrucción permanente — cada vez que `schema.sql` cambie:** todas
+   las sentencias de `backend/db/schema.sql` usan
+   `CREATE TABLE IF NOT EXISTS`, así que el comando del paso 4 es
+   idempotente — se puede volver a correr las veces que haga falta sin
+   duplicar nada ni romper lo existente. Cuando una feature ya mergeada a
+   `main` agrega una tabla o columna nueva a `schema.sql`, hay que volver
+   a correr, contra la base de producción:
+
+   ```bash
+   psql "<connection-string-de-produccion>" -f backend/db/schema.sql
+   ```
+
+   antes de que esa feature funcione en producción — el auto-deploy en
+   push a `main` (sección 4) actualiza el código del backend, pero nunca
+   corre este comando por vos. Por ejemplo: la feature de "contacto a un
+   humano" agrega la tabla `solicitudes_contacto`; sin volver a correr
+   este comando, `POST /contacto` y `/admin/contacto*` van a devolver 500
+   en producción.
 
 ## 3. Push a GitHub
 
@@ -77,6 +98,17 @@ git push -u origin main
    | `GEMINI_API_KEY` | opcional |
    | `ADMIN_JWT_SECRET` | el generado en el paso 1 |
    | `FRONTEND_ORIGIN` | `https://macacha.saltia.com.ar` |
+   | `SMTP_HOST` | host del servidor SMTP — sin default, obligatorio para que el mail de "contacto a un humano" funcione |
+   | `SMTP_PORT` | puerto SMTP (default `587` si no se define) |
+   | `SMTP_USER` | usuario SMTP — sin default, obligatorio |
+   | `SMTP_PASSWORD` | contraseña SMTP — sin default, obligatoria |
+   | `SMTP_FROM` | remitente de los mails de notificación (default `notificaciones@macacha.gob.ar` si no se define) |
+
+   Si `SMTP_HOST`, `SMTP_USER` o `SMTP_PASSWORD` quedan sin configurar, el
+   endpoint `POST /contacto` sigue respondiendo 200 (el envío de mail es
+   best-effort y no rompe la respuesta al usuario), pero ningún admin va
+   a recibir la notificación — revisar los logs del backend ante una
+   sospecha de esto.
 
 6. Activar auto-deploy (webhook) en push a `main`.
 
