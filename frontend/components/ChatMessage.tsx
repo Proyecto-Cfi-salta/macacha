@@ -4,9 +4,11 @@ import { BurbujaMensaje } from "./BurbujaMensaje";
 export function ChatMessage({
   mensaje,
   onReintentar,
+  onPedirContacto,
 }: {
   mensaje: Mensaje;
   onReintentar?: () => void;
+  onPedirContacto?: () => void;
 }) {
   const esUsuario = mensaje.rol === "user";
 
@@ -32,6 +34,14 @@ export function ChatMessage({
             </li>
           ))}
         </ul>
+      )}
+      {mensaje.sugerirContacto && onPedirContacto && (
+        <button
+          onClick={onPedirContacto}
+          className="mt-2 block text-sm text-blue-700 underline"
+        >
+          ¿Querés que te ayude una persona? Completá este formulario
+        </button>
       )}
       {mensaje.error && onReintentar && (
         <button
