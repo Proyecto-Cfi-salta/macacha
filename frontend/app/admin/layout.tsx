@@ -43,6 +43,11 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 Trámites
               </Link>
             </li>
+            <li>
+              <Link href="/admin/contacto" className="text-blue-700 hover:underline">
+                Contacto
+              </Link>
+            </li>
             {admin?.rol === "super_admin" && (
               <li>
                 <Link href="/admin/usuarios" className="text-blue-700 hover:underline">
