@@ -14,7 +14,7 @@ describe("parsearLineasSSE", () => {
 
   it("parsea un evento de fin con fuentes y candidatos ambiguos vacíos", () => {
     const bloque =
-      'data: {"tipo":"fin","fuentes":[{"tramite_id":"RC-0001","nombre_oficial":"Actas Regulares","fuente_url":"https://x"}],"candidatos_ambiguos":[]}';
+      'data: {"tipo":"fin","fuentes":[{"tramite_id":"RC-0001","nombre_oficial":"Actas Regulares","fuente_url":"https://x"}],"candidatos_ambiguos":[],"sugerir_contacto":false}';
 
     expect(parsearLineasSSE(bloque)).toEqual([
       {
@@ -27,13 +27,14 @@ describe("parsearLineasSSE", () => {
           },
         ],
         candidatos_ambiguos: [],
+        sugerir_contacto: false,
       },
     ]);
   });
 
   it("parsea un evento de fin con candidatos ambiguos", () => {
     const bloque =
-      'data: {"tipo":"fin","fuentes":[],"candidatos_ambiguos":[{"tramite_id":"TR-0002","nombre_oficial":"Denuncia laboral","descripcion":"Reclamos laborales."}]}';
+      'data: {"tipo":"fin","fuentes":[],"candidatos_ambiguos":[{"tramite_id":"TR-0002","nombre_oficial":"Denuncia laboral","descripcion":"Reclamos laborales."}],"sugerir_contacto":false}';
 
     expect(parsearLineasSSE(bloque)).toEqual([
       {
@@ -46,7 +47,17 @@ describe("parsearLineasSSE", () => {
             descripcion: "Reclamos laborales.",
           },
         ],
+        sugerir_contacto: false,
       },
+    ]);
+  });
+
+  it("parsea un evento de fin que sugiere contacto humano", () => {
+    const bloque =
+      'data: {"tipo":"fin","fuentes":[],"candidatos_ambiguos":[],"sugerir_contacto":true}';
+
+    expect(parsearLineasSSE(bloque)).toEqual([
+      { tipo: "fin", fuentes: [], candidatos_ambiguos: [], sugerir_contacto: true },
     ]);
   });
 
