@@ -10,8 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from agent import sessions
+from agent import mail, sessions
 from agent.admin import chats_repository as admin_chats_repository
+from agent.admin import contacto_repository
 from agent.admin import repository as admin_repository
 from agent.admin import security as admin_security
 from agent.admin import tramite_editor as admin_tramite_editor
@@ -137,6 +138,67 @@ def tramites_frecuentes(organismo: str, pool=Depends(obtener_pool)):
 def top_tramites(pool=Depends(obtener_pool)):
     with pool.connection() as conn:
         return obtener_top_tramites(conn)
+
+
+class ContactoPayload(BaseModel):
+    session_id: uuid.UUID
+    tramite_id: str | None = None
+    nombre: str = Field(min_length=1)
+    email: str = Field(min_length=1)
+    telefono: str = Field(min_length=1)
+    consulta: str = Field(min_length=1)
+
+
+def _armar_cuerpo_mail(request: ContactoPayload, mensajes: list[dict]) -> str:
+    lineas = [
+        f"Nombre: {request.nombre}",
+        f"Email: {request.email}",
+        f"Teléfono: {request.telefono}",
+        "",
+        "Consulta:",
+        request.consulta,
+        "",
+        "--- Conversación completa ---",
+    ]
+    for mensaje in mensajes:
+        etiqueta = "Persona" if mensaje["rol"] == "user" else "Macacha"
+        lineas.append(f"{etiqueta}: {mensaje['contenido']}")
+    return "\n".join(lineas)
+
+
+@app.post("/contacto")
+def crear_solicitud_contacto(request: ContactoPayload, pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        organismo_id = (
+            admin_tramites_repository.obtener_organismo_id_de_tramite(conn, request.tramite_id)
+            if request.tramite_id
+            else None
+        )
+        contacto_repository.crear_solicitud(
+            conn,
+            str(request.session_id),
+            request.tramite_id,
+            organismo_id,
+            request.nombre,
+            request.email,
+            request.telefono,
+            request.consulta,
+        )
+        conn.commit()
+
+        destinatarios = contacto_repository.resolver_destinatarios(conn, organismo_id)
+        mensajes = sessions.obtener_mensajes_visibles(conn, str(request.session_id))
+
+    try:
+        mail.enviar_mail(
+            destinatarios,
+            asunto=f"Nueva consulta de {request.nombre}",
+            cuerpo_texto=_armar_cuerpo_mail(request, mensajes),
+        )
+    except Exception:
+        pass  # best-effort: la solicitud ya está guardada y visible en /admin/contacto
+
+    return {"ok": True}
 
 
 class LoginRequest(BaseModel):
