@@ -518,3 +518,47 @@ def admin_crear_organismo(
         organismo_id = admin_tramites_repository.crear_organismo(conn, request.nombre)
         conn.commit()
     return {"id": organismo_id, "nombre": request.nombre}
+
+
+class ContactoEstadoPayload(BaseModel):
+    estado: Literal["pendiente", "resuelto"]
+
+
+@app.get("/admin/contacto")
+def admin_listar_contacto(admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        organismo_id = admin.organismo_id if admin.rol == "admin_organismo" else None
+        return contacto_repository.listar_solicitudes(conn, organismo_id)
+
+
+def _verificar_solicitud_de_mi_organismo(conn, admin: AdminActual, solicitud: dict | None) -> None:
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    if admin.rol == "admin_organismo" and solicitud["organismo_id"] != admin.organismo_id:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+
+@app.get("/admin/contacto/{solicitud_id}")
+def admin_obtener_contacto(
+    solicitud_id: uuid.UUID, admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)
+):
+    with pool.connection() as conn:
+        solicitud = contacto_repository.obtener_solicitud(conn, str(solicitud_id))
+        _verificar_solicitud_de_mi_organismo(conn, admin, solicitud)
+        mensajes = admin_chats_repository.obtener_mensajes_completos(conn, solicitud["session_id"])
+    return {**solicitud, "mensajes": mensajes}
+
+
+@app.put("/admin/contacto/{solicitud_id}")
+def admin_editar_estado_contacto(
+    solicitud_id: uuid.UUID,
+    request: ContactoEstadoPayload,
+    admin: AdminActual = Depends(requiere_admin),
+    pool=Depends(obtener_pool),
+):
+    with pool.connection() as conn:
+        solicitud = contacto_repository.obtener_solicitud(conn, str(solicitud_id))
+        _verificar_solicitud_de_mi_organismo(conn, admin, solicitud)
+        contacto_repository.actualizar_estado(conn, str(solicitud_id), request.estado)
+        conn.commit()
+    return {"ok": True}
