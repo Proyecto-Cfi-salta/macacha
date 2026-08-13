@@ -99,16 +99,20 @@ git push -u origin main
    | `ADMIN_JWT_SECRET` | el generado en el paso 1 |
    | `FRONTEND_ORIGIN` | `https://macacha.saltia.com.ar` |
    | `SMTP_HOST` | host del servidor SMTP — sin default, obligatorio para que el mail de "contacto a un humano" funcione |
-   | `SMTP_PORT` | puerto SMTP (default `587` si no se define) |
+   | `SMTP_PORT` | puerto SMTP — sin default, obligatorio (usar `587` salvo que el proveedor indique otro) |
    | `SMTP_USER` | usuario SMTP — sin default, obligatorio |
    | `SMTP_PASSWORD` | contraseña SMTP — sin default, obligatoria |
-   | `SMTP_FROM` | remitente de los mails de notificación (default `notificaciones@macacha.gob.ar` si no se define) |
+   | `SMTP_FROM` | remitente de los mails de notificación — sin default, obligatorio |
 
-   Si `SMTP_HOST`, `SMTP_USER` o `SMTP_PASSWORD` quedan sin configurar, el
-   endpoint `POST /contacto` sigue respondiendo 200 (el envío de mail es
-   best-effort y no rompe la respuesta al usuario), pero ningún admin va
-   a recibir la notificación — revisar los logs del backend ante una
-   sospecha de esto.
+   Las cinco variables `SMTP_*` son obligatorias: `backend/agent/mail.py`
+   las lee con `os.environ[...]` directo, sin ningún fallback en el código.
+   Si falta alguna, el envío de mail lanza `KeyError`, pero el endpoint
+   `POST /contacto` sigue respondiendo 200 igual (el envío de mail es
+   best-effort y no rompe la respuesta al usuario) — ningún admin va a
+   recibir la notificación y no habrá ningún error visible salvo en los
+   logs del backend (`logger.exception(...)`), así que verificar las
+   cinco variables ANTES de dar por buena la sección de contacto en
+   producción.
 
 6. Activar auto-deploy (webhook) en push a `main`.
 
