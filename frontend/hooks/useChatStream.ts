@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BASE_URL, obtenerHistorial } from "../lib/api";
+import type { FeedbackVoto } from "../lib/feedback";
 
 export type Fuente = {
   tramite_id: string;
@@ -22,6 +23,9 @@ export type Mensaje = {
   candidatosAmbiguos?: CandidatoAmbiguo[];
   sugerirContacto?: boolean;
   error?: boolean;
+  id?: string;
+  votable?: boolean;
+  feedback?: FeedbackVoto | null;
 };
 
 export type EventoSSE =
@@ -31,6 +35,7 @@ export type EventoSSE =
       fuentes: Fuente[];
       candidatos_ambiguos: CandidatoAmbiguo[];
       sugerir_contacto: boolean;
+      mensaje_id: string;
     }
   | { tipo: "error"; mensaje: string };
 
@@ -41,6 +46,26 @@ export function parsearLineasSSE(texto: string): EventoSSE[] {
     .map((linea) => JSON.parse(linea.slice("data: ".length)) as EventoSSE);
 }
 
+export function aplicarEventoSSE(mensajes: Mensaje[], evento: EventoSSE): Mensaje[] {
+  const copia = [...mensajes];
+  const ultimo = copia[copia.length - 1];
+  if (evento.tipo === "texto") {
+    copia[copia.length - 1] = { ...ultimo, contenido: ultimo.contenido + evento.delta };
+  } else if (evento.tipo === "fin") {
+    copia[copia.length - 1] = {
+      ...ultimo,
+      fuentes: evento.fuentes,
+      candidatosAmbiguos: evento.candidatos_ambiguos,
+      sugerirContacto: evento.sugerir_contacto,
+      id: evento.mensaje_id,
+      votable: true,
+    };
+  } else if (evento.tipo === "error") {
+    copia[copia.length - 1] = { ...ultimo, contenido: evento.mensaje, error: true };
+  }
+  return copia;
+}
+
 export function useChatStream(sessionId: string) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [enviando, setEnviando] = useState(false);
@@ -49,37 +74,20 @@ export function useChatStream(sessionId: string) {
     obtenerHistorial(sessionId)
       .then((historial) => {
         setMensajes(
-          historial.map((m) => ({ rol: m.rol, contenido: m.contenido }))
+          historial.map((m) => ({
+            rol: m.rol,
+            contenido: m.contenido,
+            id: m.id,
+            votable: m.votable,
+            feedback: m.feedback,
+          }))
         );
       })
       .catch(() => setMensajes([]));
   }, [sessionId]);
 
   function aplicarEvento(evento: EventoSSE) {
-    setMensajes((prev) => {
-      const copia = [...prev];
-      const ultimo = copia[copia.length - 1];
-      if (evento.tipo === "texto") {
-        copia[copia.length - 1] = {
-          ...ultimo,
-          contenido: ultimo.contenido + evento.delta,
-        };
-      } else if (evento.tipo === "fin") {
-        copia[copia.length - 1] = {
-          ...ultimo,
-          fuentes: evento.fuentes,
-          candidatosAmbiguos: evento.candidatos_ambiguos,
-          sugerirContacto: evento.sugerir_contacto,
-        };
-      } else if (evento.tipo === "error") {
-        copia[copia.length - 1] = {
-          ...ultimo,
-          contenido: evento.mensaje,
-          error: true,
-        };
-      }
-      return copia;
-    });
+    setMensajes((prev) => aplicarEventoSSE(prev, evento));
   }
 
   async function enviarMensaje(texto: string) {
