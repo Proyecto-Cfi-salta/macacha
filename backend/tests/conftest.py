@@ -27,6 +27,7 @@ def clean_db():
 
     def _clean() -> None:
         with conn.cursor() as cur:
+            cur.execute("DELETE FROM feedback_respuestas")
             cur.execute("DELETE FROM mensajes")
             cur.execute("DELETE FROM solicitudes_contacto")
             cur.execute("DELETE FROM sesiones")

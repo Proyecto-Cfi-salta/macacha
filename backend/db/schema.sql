@@ -98,3 +98,26 @@ CREATE TABLE IF NOT EXISTS solicitudes_contacto (
     estado TEXT NOT NULL DEFAULT 'pendiente',
     creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS feedback_respuestas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    mensaje_id UUID NOT NULL UNIQUE REFERENCES mensajes(id),
+    session_id UUID NOT NULL REFERENCES sesiones(id),
+    util BOOLEAN NOT NULL,
+    motivo TEXT,
+    comentario TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT feedback_motivo_valido CHECK (
+        motivo IS NULL OR motivo IN (
+            'no_respondio', 'info_incorrecta', 'faltaba_info', 'otro_tramite',
+            'desactualizada', 'poco_clara', 'otro'
+        )
+    ),
+    CONSTRAINT feedback_comentario_largo CHECK (comentario IS NULL OR char_length(comentario) <= 500),
+    CONSTRAINT feedback_detalle_solo_si_no_util CHECK (
+        util = false OR (motivo IS NULL AND comentario IS NULL)
+    )
+);
+
+CREATE INDEX IF NOT EXISTS feedback_respuestas_session_idx ON feedback_respuestas (session_id);
