@@ -4,6 +4,7 @@ import {
   MAX_COMENTARIO,
   MOTIVOS,
   estadoInicialFeedback,
+  feedbackVisible,
   textoMotivo,
 } from "./feedback";
 
@@ -68,5 +69,19 @@ describe("textoMotivo", () => {
   it("devuelve cadena vacía para null o desconocido", () => {
     expect(textoMotivo(null)).toBe("");
     expect(textoMotivo("inventado")).toBe("");
+  });
+});
+
+describe("feedbackVisible", () => {
+  it("oculta el widget solo en la respuesta que se está transmitiendo", () => {
+    expect(feedbackVisible({ esUltimo: true, enviando: true })).toBe(false);
+  });
+
+  it("mantiene montados los widgets de respuestas anteriores mientras se contesta otro mensaje", () => {
+    expect(feedbackVisible({ esUltimo: false, enviando: true })).toBe(true);
+  });
+
+  it("muestra el widget de la última respuesta cuando terminó el stream", () => {
+    expect(feedbackVisible({ esUltimo: true, enviando: false })).toBe(true);
   });
 });

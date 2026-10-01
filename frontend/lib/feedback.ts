@@ -38,6 +38,16 @@ export function estadoInicialFeedback(
   return feedback.motivo || feedback.comentario ? "gracias_no" : "detalle";
 }
 
+export function feedbackVisible({
+  esUltimo,
+  enviando,
+}: {
+  esUltimo: boolean;
+  enviando: boolean;
+}): boolean {
+  return !(esUltimo && enviando);
+}
+
 export function textoMotivo(valor: string | null): string {
   return MOTIVOS.find((m) => m.valor === valor)?.texto ?? "";
 }

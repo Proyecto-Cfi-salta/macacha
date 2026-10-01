@@ -10,6 +10,7 @@ import { TramiteInfoPanel } from "../components/TramiteInfoPanel";
 import { TramitesAmbiguosPanel } from "../components/TramitesAmbiguosPanel";
 import { TramitesFrecuentesPanel } from "../components/TramitesFrecuentesPanel";
 import { useChatStream } from "../hooks/useChatStream";
+import { feedbackVisible } from "../lib/feedback";
 import { usePanelTramite } from "../hooks/usePanelTramite";
 import { useSession } from "../hooks/useSession";
 
@@ -69,7 +70,7 @@ function Chat({ sessionId }: { sessionId: string }) {
                 key={indice}
                 mensaje={mensaje}
                 sessionId={sessionId}
-                mostrarFeedback={!enviando}
+                mostrarFeedback={feedbackVisible({ esUltimo: indice === mensajes.length - 1, enviando })}
                 onReintentar={
                   mensaje.error && !enviando
                     ? () => {
