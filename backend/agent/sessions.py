@@ -63,14 +63,26 @@ def obtener_mensajes_visibles(conn, session_id: str) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT rol, contenido, created_at
-            FROM mensajes
-            WHERE session_id = %s AND rol IN ('user', 'assistant') AND contenido IS NOT NULL
-            ORDER BY orden
+            SELECT m.id, m.rol, m.contenido, m.created_at,
+                   (m.rol = 'assistant' AND m.tool_calls IS NULL) AS votable,
+                   f.util, f.motivo, f.comentario
+            FROM mensajes m
+            LEFT JOIN feedback_respuestas f ON f.mensaje_id = m.id
+            WHERE m.session_id = %s AND m.rol IN ('user', 'assistant') AND m.contenido IS NOT NULL
+            ORDER BY m.orden
             """,
             (session_id,),
         )
         return [
-            {"rol": rol, "contenido": contenido, "creado_en": creado_en.isoformat()}
-            for rol, contenido, creado_en in cur.fetchall()
+            {
+                "id": str(mensaje_id),
+                "rol": rol,
+                "contenido": contenido,
+                "creado_en": creado_en.isoformat(),
+                "votable": votable,
+                "feedback": (
+                    None if util is None else {"util": util, "motivo": motivo, "comentario": comentario}
+                ),
+            }
+            for mensaje_id, rol, contenido, creado_en, votable, util, motivo, comentario in cur.fetchall()
         ]
