@@ -34,3 +34,14 @@ def test_admins_tiene_columnas_de_rol_y_organismo(db_conn):
         )
         columnas = {row[0] for row in cur.fetchall()}
         assert {"rol", "organismo_id", "activo"} <= columnas
+
+
+def test_organismos_tiene_columna_email_contacto(db_conn):
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'organismos' AND column_name = 'email_contacto'
+            """
+        )
+        assert cur.fetchone() is not None

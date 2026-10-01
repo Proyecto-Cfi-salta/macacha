@@ -24,6 +24,12 @@ def crear_solicitud(
 def resolver_destinatarios(conn, organismo_id: int | None) -> list[str]:
     if organismo_id is not None:
         with conn.cursor() as cur:
+            cur.execute("SELECT email_contacto FROM organismos WHERE id = %s", (organismo_id,))
+            fila = cur.fetchone()
+        if fila is not None and fila[0]:
+            return [fila[0]]
+
+        with conn.cursor() as cur:
             cur.execute(
                 "SELECT email FROM admins WHERE organismo_id = %s AND activo = true",
                 (organismo_id,),
@@ -93,3 +99,29 @@ def actualizar_estado(conn, solicitud_id: str, estado: str) -> None:
         cur.execute(
             "UPDATE solicitudes_contacto SET estado = %s WHERE id = %s", (estado, solicitud_id)
         )
+
+
+def listar_casillas(conn, organismo_id: int | None) -> list[dict]:
+    with conn.cursor() as cur:
+        if organismo_id is None:
+            cur.execute("SELECT id, nombre, email_contacto FROM organismos ORDER BY nombre")
+        else:
+            cur.execute(
+                "SELECT id, nombre, email_contacto FROM organismos WHERE id = %s", (organismo_id,)
+            )
+        return [
+            {"id": id_, "nombre": nombre, "email_contacto": email}
+            for id_, nombre, email in cur.fetchall()
+        ]
+
+
+def guardar_casilla(conn, organismo_id: int, email_contacto: str | None) -> dict | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE organismos SET email_contacto = %s WHERE id = %s RETURNING id, nombre, email_contacto",
+            (email_contacto, organismo_id),
+        )
+        fila = cur.fetchone()
+    if fila is None:
+        return None
+    return {"id": fila[0], "nombre": fila[1], "email_contacto": fila[2]}

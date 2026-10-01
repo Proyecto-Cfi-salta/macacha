@@ -122,3 +122,97 @@ def test_resolver_destinatarios_ignora_admins_inactivos(db_conn, clean_db):
     db_conn.commit()
 
     assert contacto_repository.resolver_destinatarios(db_conn, organismo_id) == ["super@x.com"]
+
+
+def test_listar_casillas_sin_filtro_devuelve_todos_ordenados_por_nombre(db_conn, clean_db):
+    rentas = repo.upsert_organismo(db_conn, "Rentas")
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    contacto_repository.guardar_casilla(db_conn, rentas, "rentas@x.com")
+    db_conn.commit()
+
+    casillas = contacto_repository.listar_casillas(db_conn, None)
+
+    assert casillas == [
+        {"id": registro, "nombre": "Registro Civil", "email_contacto": None},
+        {"id": rentas, "nombre": "Rentas", "email_contacto": "rentas@x.com"},
+    ]
+
+
+def test_listar_casillas_con_organismo_devuelve_solo_ese(db_conn, clean_db):
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_organismo(db_conn, "Rentas")
+    db_conn.commit()
+
+    casillas = contacto_repository.listar_casillas(db_conn, registro)
+
+    assert [c["nombre"] for c in casillas] == ["Registro Civil"]
+
+
+def test_listar_casillas_de_organismo_inexistente_devuelve_lista_vacia(db_conn, clean_db):
+    assert contacto_repository.listar_casillas(db_conn, 99999) == []
+
+
+def test_guardar_casilla_actualiza_y_devuelve_el_organismo(db_conn, clean_db):
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    db_conn.commit()
+
+    guardada = contacto_repository.guardar_casilla(db_conn, registro, "mesa@x.com")
+    db_conn.commit()
+
+    assert guardada == {"id": registro, "nombre": "Registro Civil", "email_contacto": "mesa@x.com"}
+    assert contacto_repository.listar_casillas(db_conn, registro)[0]["email_contacto"] == "mesa@x.com"
+
+
+def test_guardar_casilla_none_borra_la_casilla_y_queda_null(db_conn, clean_db):
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    contacto_repository.guardar_casilla(db_conn, registro, "mesa@x.com")
+
+    contacto_repository.guardar_casilla(db_conn, registro, None)
+    db_conn.commit()
+
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT email_contacto IS NULL FROM organismos WHERE id = %s", (registro,))
+        assert cur.fetchone()[0] is True
+
+
+def test_guardar_casilla_de_organismo_inexistente_devuelve_none(db_conn, clean_db):
+    assert contacto_repository.guardar_casilla(db_conn, 99999, "mesa@x.com") is None
+
+
+def test_resolver_destinatarios_prioriza_la_casilla_sobre_los_admins(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    _crear_admin(db_conn, "org@x.com", rol="admin_organismo", organismo_id=organismo_id)
+    _crear_admin(db_conn, "super@x.com", rol="super_admin", organismo_id=None)
+    contacto_repository.guardar_casilla(db_conn, organismo_id, "mesa@registro.gob.ar")
+    db_conn.commit()
+
+    assert contacto_repository.resolver_destinatarios(db_conn, organismo_id) == ["mesa@registro.gob.ar"]
+
+
+def test_resolver_destinatarios_con_casilla_borrada_vuelve_al_respaldo_de_admins(db_conn, clean_db):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    _crear_admin(db_conn, "org@x.com", rol="admin_organismo", organismo_id=organismo_id)
+    contacto_repository.guardar_casilla(db_conn, organismo_id, "mesa@registro.gob.ar")
+    contacto_repository.guardar_casilla(db_conn, organismo_id, None)
+    db_conn.commit()
+
+    assert contacto_repository.resolver_destinatarios(db_conn, organismo_id) == ["org@x.com"]
+
+
+def test_resolver_destinatarios_no_usa_la_casilla_de_otro_organismo(db_conn, clean_db):
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    rentas = repo.upsert_organismo(db_conn, "Rentas")
+    _crear_admin(db_conn, "super@x.com", rol="super_admin", organismo_id=None)
+    contacto_repository.guardar_casilla(db_conn, rentas, "rentas@x.com")
+    db_conn.commit()
+
+    assert contacto_repository.resolver_destinatarios(db_conn, registro) == ["super@x.com"]
+
+
+def test_resolver_destinatarios_sin_organismo_ignora_todas_las_casillas(db_conn, clean_db):
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    _crear_admin(db_conn, "super@x.com", rol="super_admin", organismo_id=None)
+    contacto_repository.guardar_casilla(db_conn, registro, "mesa@x.com")
+    db_conn.commit()
+
+    assert contacto_repository.resolver_destinatarios(db_conn, None) == ["super@x.com"]

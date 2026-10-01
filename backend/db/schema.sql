@@ -121,3 +121,8 @@ CREATE TABLE IF NOT EXISTS feedback_respuestas (
 );
 
 CREATE INDEX IF NOT EXISTS feedback_respuestas_session_idx ON feedback_respuestas (session_id);
+
+ALTER TABLE organismos ADD COLUMN IF NOT EXISTS email_contacto TEXT;
+ALTER TABLE organismos DROP CONSTRAINT IF EXISTS organismos_email_contacto_largo;
+ALTER TABLE organismos ADD CONSTRAINT organismos_email_contacto_largo
+    CHECK (email_contacto IS NULL OR char_length(email_contacto) <= 254);

@@ -279,6 +279,7 @@ def test_guardar_casilla_actualiza_y_devuelve_el_organismo(db_conn, clean_db):
     db_conn.commit()
 
     guardada = contacto_repository.guardar_casilla(db_conn, registro, "mesa@x.com")
+    db_conn.commit()
 
     assert guardada == {"id": registro, "nombre": "Registro Civil", "email_contacto": "mesa@x.com"}
     assert contacto_repository.listar_casillas(db_conn, registro)[0]["email_contacto"] == "mesa@x.com"
@@ -289,6 +290,7 @@ def test_guardar_casilla_none_borra_la_casilla_y_queda_null(db_conn, clean_db):
     contacto_repository.guardar_casilla(db_conn, registro, "mesa@x.com")
 
     contacto_repository.guardar_casilla(db_conn, registro, None)
+    db_conn.commit()
 
     with db_conn.cursor() as cur:
         cur.execute("SELECT email_contacto IS NULL FROM organismos WHERE id = %s", (registro,))
