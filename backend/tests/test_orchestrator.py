@@ -54,6 +54,12 @@ def _armar_tramite_de_prueba(conn, tramite_id="RC-0001", nombre_oficial="Actas R
     conn.commit()
 
 
+def _fin_sin_mensaje_id(eventos):
+    fin = dict(eventos[-1])
+    assert isinstance(fin.pop("mensaje_id"), str)
+    return fin
+
+
 def test_procesar_turno_sin_tool_calls(db_conn, clean_db):
     session_id = str(uuid.uuid4())
     chat_client = _FakeChatClient(
@@ -67,7 +73,7 @@ def test_procesar_turno_sin_tool_calls(db_conn, clean_db):
 
     texto = "".join(e["delta"] for e in eventos if e["tipo"] == "texto")
     assert texto.strip() == "Hola, en qué te ayudo?"
-    assert eventos[-1] == {
+    assert _fin_sin_mensaje_id(eventos) == {
         "tipo": "fin",
         "fuentes": [],
         "candidatos_ambiguos": [],
@@ -119,7 +125,7 @@ def test_procesar_turno_con_tool_call_arma_fuentes(db_conn, clean_db):
 
     texto = "".join(e["delta"] for e in eventos if e["tipo"] == "texto")
     assert texto.strip() == "Necesitás tu DNI."
-    assert eventos[-1] == {
+    assert _fin_sin_mensaje_id(eventos) == {
         "tipo": "fin",
         "fuentes": [
             {
@@ -219,7 +225,7 @@ def test_procesar_turno_busqueda_con_match_unico_cita_la_fuente(db_conn, clean_d
     )
     db_conn.commit()
 
-    assert eventos[-1] == {
+    assert _fin_sin_mensaje_id(eventos) == {
         "tipo": "fin",
         "fuentes": [
             {
@@ -429,7 +435,7 @@ def test_procesar_turno_busqueda_sin_resultados_no_cita_fuentes(db_conn, clean_d
     )
     db_conn.commit()
 
-    assert eventos[-1] == {
+    assert _fin_sin_mensaje_id(eventos) == {
         "tipo": "fin",
         "fuentes": [],
         "candidatos_ambiguos": [],
@@ -532,3 +538,48 @@ def test_procesar_turno_normal_no_marca_sugerir_contacto(db_conn, clean_db):
     db_conn.commit()
 
     assert eventos[-1]["sugerir_contacto"] is False
+
+
+def test_fin_incluye_el_id_de_la_respuesta_final_guardada(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    chat_client = _FakeChatClient([{"role": "assistant", "content": "Hola", "tool_calls": None}])
+
+    eventos = list(
+        procesar_turno(db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "hola")
+    )
+    db_conn.commit()
+
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM mensajes WHERE session_id = %s AND rol = 'assistant' ORDER BY orden DESC LIMIT 1",
+            (session_id,),
+        )
+        id_guardado = str(cur.fetchone()[0])
+    assert eventos[-1]["mensaje_id"] == id_guardado
+
+
+def test_fin_por_iteraciones_agotadas_incluye_el_id_del_mensaje_de_cierre(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    llamada = {
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": "ofrecer_contacto_humano", "arguments": "{}"},
+    }
+    chat_client = _FakeChatClient(
+        [{"role": "assistant", "content": None, "tool_calls": [llamada]} for _ in range(5)]
+    )
+
+    eventos = list(
+        procesar_turno(db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "hola")
+    )
+    db_conn.commit()
+
+    assert eventos[-1]["sugerir_contacto"] is True
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, contenido FROM mensajes WHERE session_id = %s AND rol = 'assistant' ORDER BY orden DESC LIMIT 1",
+            (session_id,),
+        )
+        id_guardado, contenido = cur.fetchone()
+    assert contenido.startswith("No pude resolver tu consulta")
+    assert eventos[-1]["mensaje_id"] == str(id_guardado)

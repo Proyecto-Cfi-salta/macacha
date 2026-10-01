@@ -99,7 +99,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
 
         if not tool_calls:
             _citar_candidatos_mencionados(contenido, candidatos_buscados, tramites_citados)
-            sessions.guardar_mensaje(
+            mensaje_id = sessions.guardar_mensaje(
                 conn,
                 session_id,
                 rol="assistant",
@@ -113,6 +113,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
                     [] if tramites_citados else _armar_candidatos_ambiguos(conn, candidatos_buscados)
                 ),
                 "sugerir_contacto": sugerir_contacto,
+                "mensaje_id": mensaje_id,
             }
             return
 
@@ -160,7 +161,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
             )
 
     mensaje_agotado = "No pude resolver tu consulta en este momento. ¿Podés reformularla?"
-    sessions.guardar_mensaje(conn, session_id, rol="assistant", contenido=mensaje_agotado)
+    mensaje_id = sessions.guardar_mensaje(conn, session_id, rol="assistant", contenido=mensaje_agotado)
     yield {"tipo": "texto", "delta": mensaje_agotado}
     yield {
         "tipo": "fin",
@@ -169,6 +170,7 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
             [] if tramites_citados else _armar_candidatos_ambiguos(conn, candidatos_buscados)
         ),
         "sugerir_contacto": True,
+        "mensaje_id": mensaje_id,
     }
 
 
