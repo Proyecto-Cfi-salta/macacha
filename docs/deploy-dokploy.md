@@ -98,6 +98,7 @@ git push -u origin main
    | `GEMINI_API_KEY` | opcional |
    | `ADMIN_JWT_SECRET` | el generado en el paso 1 |
    | `FRONTEND_ORIGIN` | `https://macacha.saltia.com.ar` |
+   | `COOKIE_DOMAIN` | `macacha.saltia.com.ar` (sin esto la cookie de sesión del admin queda atada a `api.…` y el middleware del frontend no la ve: el login vuelve al formulario) |
    | `SMTP_HOST` | host del servidor SMTP — sin default, obligatorio para que el mail de "contacto a un humano" funcione |
    | `SMTP_PORT` | puerto SMTP — sin default, obligatorio (usar `587` salvo que el proveedor indique otro) |
    | `SMTP_USER` | usuario SMTP — sin default, obligatorio |

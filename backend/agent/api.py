@@ -240,13 +240,14 @@ def admin_login(request: LoginRequest, response: Response, pool=Depends(obtener_
         secure=True,
         samesite="lax",
         max_age=86400,
+        domain=os.environ.get("COOKIE_DOMAIN") or None,
     )
     return {"email": admin["email"], "rol": admin["rol"], "organismo": organismo}
 
 
 @app.post("/admin/logout")
 def admin_logout(response: Response):
-    response.delete_cookie("admin_session")
+    response.delete_cookie("admin_session", domain=os.environ.get("COOKIE_DOMAIN") or None)
     return {"ok": True}
 
 

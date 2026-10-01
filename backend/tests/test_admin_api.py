@@ -52,6 +52,21 @@ def test_login_credenciales_validas_setea_cookie(db_conn, clean_db, monkeypatch)
     assert "admin_session" in respuesta.cookies
 
 
+def test_login_cookie_usa_cookie_domain_si_esta_definido(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    monkeypatch.setenv("COOKIE_DOMAIN", "macacha.saltia.com.ar")
+    email, password = _crear_admin(db_conn)
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        respuesta = client.post("/admin/login", json={"email": email, "password": password})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert "domain=macacha.saltia.com.ar" in respuesta.headers["set-cookie"].lower()
+
+
 def test_login_password_incorrecta_devuelve_401(db_conn, clean_db, monkeypatch):
     monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
     email, _ = _crear_admin(db_conn)
