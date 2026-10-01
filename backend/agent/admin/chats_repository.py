@@ -28,6 +28,7 @@ def listar_sesiones(conn, page: int, page_size: int) -> list[dict]:
     conteos = _contar_mensajes_visibles_batch(conn, session_ids)
     ultimos = _obtener_ultimo_mensaje_batch(conn, session_ids)
     citados = _extraer_tramites_citados_batch(conn, session_ids)
+    votos = _contar_votos_batch(conn, session_ids)
 
     return [
         {
@@ -36,6 +37,8 @@ def listar_sesiones(conn, page: int, page_size: int) -> list[dict]:
             "cantidad_mensajes": conteos.get(str(sesion_id), 0),
             "ultimo_mensaje": ultimos.get(str(sesion_id)),
             "tramites_citados": citados.get(str(sesion_id), []),
+            "votos_positivos": votos.get(str(sesion_id), (0, 0))[0],
+            "votos_negativos": votos.get(str(sesion_id), (0, 0))[1],
         }
         for sesion_id, creado_en in filas
     ]
@@ -51,24 +54,35 @@ def obtener_mensajes_completos(conn, session_id: str) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT rol, contenido, tool_calls, tool_call_id, proveedor, created_at
-            FROM mensajes
-            WHERE session_id = %s
-            ORDER BY orden ASC
+            SELECT m.id, m.rol, m.contenido, m.tool_calls, m.tool_call_id, m.proveedor, m.created_at,
+                   f.util, f.motivo, f.comentario
+            FROM mensajes m
+            LEFT JOIN feedback_respuestas f ON f.mensaje_id = m.id
+            WHERE m.session_id = %s
+            ORDER BY m.orden ASC
             """,
             (session_id,),
         )
         filas = cur.fetchall()
 
     mensajes = []
-    for rol, contenido, tool_calls, tool_call_id, proveedor, creado_en in filas:
-        mensaje: dict = {"rol": rol, "contenido": contenido, "creado_en": creado_en.isoformat()}
+    for mensaje_id, rol, contenido, tool_calls, tool_call_id, proveedor, creado_en, util, motivo, comentario in filas:
+        mensaje: dict = {
+            "id": str(mensaje_id),
+            "rol": rol,
+            "contenido": contenido,
+            "creado_en": creado_en.isoformat(),
+        }
         if tool_calls is not None:
             mensaje["tool_calls"] = tool_calls
         if tool_call_id is not None:
             mensaje["tool_call_id"] = tool_call_id
         if proveedor is not None:
             mensaje["proveedor"] = proveedor
+        if rol == "assistant":
+            mensaje["feedback"] = (
+                None if util is None else {"util": util, "motivo": motivo, "comentario": comentario}
+            )
         mensajes.append(mensaje)
     return mensajes
 
@@ -85,6 +99,20 @@ def _contar_mensajes_visibles_batch(conn, session_ids: list[str]) -> dict[str, i
             (session_ids,),
         )
         return {str(session_id): total for session_id, total in cur.fetchall()}
+
+
+def _contar_votos_batch(conn, session_ids: list[str]) -> dict[str, tuple[int, int]]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT session_id, COUNT(*) FILTER (WHERE util), COUNT(*) FILTER (WHERE NOT util)
+            FROM feedback_respuestas
+            WHERE session_id = ANY(%s)
+            GROUP BY session_id
+            """,
+            (session_ids,),
+        )
+        return {str(session_id): (positivos, negativos) for session_id, positivos, negativos in cur.fetchall()}
 
 
 def _obtener_ultimo_mensaje_batch(conn, session_ids: list[str]) -> dict[str, str]:
@@ -165,6 +193,7 @@ def listar_sesiones_de_organismo(
     ids_pagina = [str(sesion_id) for sesion_id, _ in pagina]
     conteos = _contar_mensajes_visibles_batch(conn, ids_pagina)
     ultimos = _obtener_ultimo_mensaje_batch(conn, ids_pagina)
+    votos = _contar_votos_batch(conn, ids_pagina)
 
     resultado = [
         {
@@ -173,6 +202,8 @@ def listar_sesiones_de_organismo(
             "cantidad_mensajes": conteos.get(str(sesion_id), 0),
             "ultimo_mensaje": ultimos.get(str(sesion_id)),
             "tramites_citados": citados.get(str(sesion_id), []),
+            "votos_positivos": votos.get(str(sesion_id), (0, 0))[0],
+            "votos_negativos": votos.get(str(sesion_id), (0, 0))[1],
         }
         for sesion_id, creado_en in pagina
     ]
@@ -204,3 +235,11 @@ def _organismos_de_tramites(conn, citados_por_sesion: dict[str, list[str]]) -> d
             (list(tramite_ids),),
         )
         return {tramite_id: organismo_id for tramite_id, organismo_id in cur.fetchall()}
+
+
+def tramites_citados_por_sesion(conn, session_ids: list[str]) -> dict[str, list[str]]:
+    return _extraer_tramites_citados_batch(conn, session_ids)
+
+
+def organismos_de_tramites(conn, citados_por_sesion: dict[str, list[str]]) -> dict[str, int]:
+    return _organismos_de_tramites(conn, citados_por_sesion)

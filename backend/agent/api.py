@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from agent import feedback, mail, sessions
 from agent.admin import chats_repository as admin_chats_repository
 from agent.admin import contacto_repository
+from agent.admin import feedback_repository as admin_feedback_repository
 from agent.admin import repository as admin_repository
 from agent.admin import security as admin_security
 from agent.admin import tramite_editor as admin_tramite_editor
@@ -331,6 +332,13 @@ def admin_obtener_sesion(
         if not permitido:
             raise HTTPException(status_code=404, detail="Sesión no encontrada")
         return admin_chats_repository.obtener_mensajes_completos(conn, str(session_id))
+
+
+@app.get("/admin/feedback/metricas")
+def admin_metricas_feedback(admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        organismo_id = admin.organismo_id if admin.rol == "admin_organismo" else None
+        return admin_feedback_repository.calcular_metricas(conn, organismo_id)
 
 
 @app.get("/admin/tramites")
