@@ -67,6 +67,15 @@ Guardá el resultado — se usa en el paso 4.
    este comando, `POST /contacto` y `/admin/contacto*` van a devolver 500
    en producción.
 
+   Lo mismo vale para el feedback de respuestas (botones 👍/👎 del chat):
+   agrega la tabla `feedback_respuestas`. Orden obligatorio: **primero**
+   correr el comando, **después** desplegar el backend y por último el
+   frontend. Si el backend sale antes que la tabla, `POST /contacto`,
+   `GET /sesiones/{id}/mensajes`, `/admin/sesiones*` y
+   `/admin/feedback/metricas` devuelven 500 (todos leen el historial con un
+   `JOIN` a la tabla nueva); si el frontend sale antes que el backend, los
+   votos fallan con el aviso "No se pudo enviar tu opinión".
+
 ## 3. Push a GitHub
 
 Si todavía no existe el repo remoto, creá uno privado (desde la web de
