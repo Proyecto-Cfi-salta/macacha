@@ -1,8 +1,10 @@
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from agent import api, sessions
+from agent.admin import contacto_repository
 from agent.admin import repository as admin_repository
 from agent.admin import security as admin_security
 from agent.api import obtener_pool
@@ -167,3 +169,177 @@ def test_editar_estado_solicitud_propia(db_conn, clean_db, monkeypatch):
     with db_conn.cursor() as cur:
         cur.execute("SELECT estado FROM solicitudes_contacto WHERE id = %s", (solicitud_id,))
         assert cur.fetchone()[0] == "resuelto"
+
+
+def _con_pool(db_conn):
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    return TestClient(api.app, base_url="https://testserver")
+
+
+def _casilla_de(db_conn, organismo_id):
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT email_contacto FROM organismos WHERE id = %s", (organismo_id,))
+        return cur.fetchone()[0]
+
+
+def test_get_casillas_requiere_autenticacion(db_conn, clean_db):
+    client = _con_pool(db_conn)
+    try:
+        respuesta = client.get("/admin/contacto/casillas")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 401
+
+
+def test_get_casillas_super_admin_ve_todos_ordenados_y_la_ruta_no_se_confunde_con_un_id(
+    db_conn, clean_db, monkeypatch
+):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    rentas = repo.upsert_organismo(db_conn, "Rentas")
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    db_conn.commit()
+
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.get("/admin/contacto/casillas")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == [
+        {"id": registro, "nombre": "Registro Civil", "email_contacto": None},
+        {"id": rentas, "nombre": "Rentas", "email_contacto": None},
+    ]
+
+
+def test_get_casillas_admin_de_organismo_ve_solo_la_suya(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    propio = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_organismo(db_conn, "Rentas")
+    db_conn.commit()
+
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn, rol="admin_organismo", organismo_id=propio)
+        respuesta = client.get("/admin/contacto/casillas")
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert [c["nombre"] for c in respuesta.json()] == ["Registro Civil"]
+
+
+def test_put_casilla_requiere_autenticacion(db_conn, clean_db):
+    client = _con_pool(db_conn)
+    try:
+        respuesta = client.put("/admin/contacto/casillas/1", json={"email_contacto": "a@b.co"})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 401
+
+
+def test_put_casilla_super_admin_guarda_y_recorta(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    db_conn.commit()
+
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.put(
+            f"/admin/contacto/casillas/{registro}", json={"email_contacto": "  mesa@registro.gob.ar "}
+        )
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == {"id": registro, "nombre": "Registro Civil", "email_contacto": "mesa@registro.gob.ar"}
+    assert _casilla_de(db_conn, registro) == "mesa@registro.gob.ar"
+
+
+@pytest.mark.parametrize("valor", [None, "", "   "])
+def test_put_casilla_vacia_o_null_borra_la_casilla_y_guarda_null(db_conn, clean_db, monkeypatch, valor):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    contacto_repository.guardar_casilla(db_conn, registro, "vieja@x.com")
+    db_conn.commit()
+
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.put(f"/admin/contacto/casillas/{registro}", json={"email_contacto": valor})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["email_contacto"] is None
+    assert _casilla_de(db_conn, registro) is None
+
+
+@pytest.mark.parametrize("valor", ["sin-arroba", "a@b", "a b@c.com", "a@@b.com", "@x.com", "a" * 260 + "@x.com"])
+def test_put_casilla_invalida_devuelve_422_y_no_escribe(db_conn, clean_db, monkeypatch, valor):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    registro = repo.upsert_organismo(db_conn, "Registro Civil")
+    contacto_repository.guardar_casilla(db_conn, registro, "vieja@x.com")
+    db_conn.commit()
+
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.put(f"/admin/contacto/casillas/{registro}", json={"email_contacto": valor})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 422
+    assert _casilla_de(db_conn, registro) == "vieja@x.com"
+
+
+def test_put_casilla_organismo_inexistente_devuelve_404(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.put("/admin/contacto/casillas/99999", json={"email_contacto": "a@b.co"})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 404
+
+
+def test_put_casilla_admin_de_organismo_edita_la_suya(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    propio = repo.upsert_organismo(db_conn, "Registro Civil")
+    db_conn.commit()
+
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn, rol="admin_organismo", organismo_id=propio)
+        respuesta = client.put(f"/admin/contacto/casillas/{propio}", json={"email_contacto": "mesa@x.com"})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    assert _casilla_de(db_conn, propio) == "mesa@x.com"
+
+
+@pytest.mark.parametrize("valor", ["mesa@x.com", "esto-no-es-un-email"])
+def test_put_casilla_admin_de_organismo_sobre_otro_organismo_devuelve_404_sin_escribir(
+    db_conn, clean_db, monkeypatch, valor
+):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    propio = repo.upsert_organismo(db_conn, "Registro Civil")
+    ajeno = repo.upsert_organismo(db_conn, "Rentas")
+    contacto_repository.guardar_casilla(db_conn, ajeno, "original@x.com")
+    db_conn.commit()
+
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn, rol="admin_organismo", organismo_id=propio)
+        respuesta = client.put(f"/admin/contacto/casillas/{ajeno}", json={"email_contacto": valor})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 404
+    assert _casilla_de(db_conn, ajeno) == "original@x.com"

@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from agent import feedback, mail, sessions
 from agent.admin import chats_repository as admin_chats_repository
 from agent.admin import contacto_repository
+from agent.admin.email_contacto import normalizar_email_contacto
 from agent.admin import feedback_repository as admin_feedback_repository
 from agent.admin import repository as admin_repository
 from agent.admin import security as admin_security
@@ -575,6 +576,39 @@ def _verificar_solicitud_de_mi_organismo(conn, admin: AdminActual, solicitud: di
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
     if admin.rol == "admin_organismo" and solicitud["organismo_id"] != admin.organismo_id:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+
+class CasillaPayload(BaseModel):
+    email_contacto: str | None = None
+
+
+@app.get("/admin/contacto/casillas")
+def admin_listar_casillas(admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)):
+    with pool.connection() as conn:
+        organismo_id = admin.organismo_id if admin.rol == "admin_organismo" else None
+        return contacto_repository.listar_casillas(conn, organismo_id)
+
+
+@app.put("/admin/contacto/casillas/{organismo_id}")
+def admin_guardar_casilla(
+    organismo_id: int,
+    request: CasillaPayload,
+    admin: AdminActual = Depends(requiere_admin),
+    pool=Depends(obtener_pool),
+):
+    if admin.rol == "admin_organismo" and organismo_id != admin.organismo_id:
+        raise HTTPException(status_code=404, detail="Organismo no encontrado")
+    try:
+        email = normalizar_email_contacto(request.email_contacto)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+
+    with pool.connection() as conn:
+        casilla = contacto_repository.guardar_casilla(conn, organismo_id, email)
+        if casilla is None:
+            raise HTTPException(status_code=404, detail="Organismo no encontrado")
+        conn.commit()
+    return casilla
 
 
 @app.get("/admin/contacto/{solicitud_id}")

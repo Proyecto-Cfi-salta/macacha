@@ -4,6 +4,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from agent import api, sessions
+from agent.admin import contacto_repository
 from agent.api import obtener_pool
 from ingest import repository as repo
 
@@ -161,3 +162,46 @@ def test_post_contacto_campo_faltante_devuelve_422(db_conn, clean_db):
         api.app.dependency_overrides.clear()
 
     assert respuesta.status_code == 422
+
+
+def _organismo_con_tramite(db_conn, casilla=None, admin_email=None):
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    if casilla:
+        contacto_repository.guardar_casilla(db_conn, organismo_id, casilla)
+    if admin_email:
+        with db_conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO admins (email, password_hash, rol, organismo_id) VALUES (%s, 'hash', 'admin_organismo', %s)",
+                (admin_email, organismo_id),
+            )
+    db_conn.commit()
+    return organismo_id
+
+
+def _post_contacto_y_destinatarios(db_conn):
+    session_id = str(uuid.uuid4())
+    sessions.crear_sesion_si_no_existe(db_conn, session_id)
+    db_conn.commit()
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app)
+    try:
+        with patch("agent.api.mail.enviar_mail") as enviar_mail_mock:
+            respuesta = client.post("/contacto", json=_payload(session_id, tramite_id="RC-0001"))
+    finally:
+        api.app.dependency_overrides.clear()
+    assert respuesta.status_code == 200
+    enviar_mail_mock.assert_called_once()
+    return enviar_mail_mock.call_args.args[0]
+
+
+def test_post_contacto_envia_el_aviso_solo_a_la_casilla_del_organismo(db_conn, clean_db):
+    _organismo_con_tramite(db_conn, casilla="mesa@registro.gob.ar", admin_email="admin@registro.gob.ar")
+
+    assert _post_contacto_y_destinatarios(db_conn) == ["mesa@registro.gob.ar"]
+
+
+def test_post_contacto_sin_casilla_envia_a_los_admins_del_organismo(db_conn, clean_db):
+    _organismo_con_tramite(db_conn, admin_email="admin@registro.gob.ar")
+
+    assert _post_contacto_y_destinatarios(db_conn) == ["admin@registro.gob.ar"]
