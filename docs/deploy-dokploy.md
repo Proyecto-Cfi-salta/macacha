@@ -76,6 +76,17 @@ Guardá el resultado — se usa en el paso 4.
    `JOIN` a la tabla nueva); si el frontend sale antes que el backend, los
    votos fallan con el aviso "No se pudo enviar tu opinión".
 
+   La casilla de mail de contacto por organismo agrega la columna
+   `organismos.email_contacto`. Mismo orden obligatorio: **primero** correr
+   el comando, **después** desplegar el backend y por último el frontend. Si
+   el backend sale antes que la columna, `POST /contacto` y
+   `/admin/contacto/casillas` devuelven 500 (leen `email_contacto`). Las
+   casillas arrancan vacías, así que hasta que alguien las cargue desde
+   Contacto el aviso sigue yendo a los emails de los usuarios del organismo.
+   Además, el servidor SMTP de producción usa el puerto 465 (SSL implícito):
+   el backend lo soporta desde el arreglo de `enviar_mail`; con otro puerto se
+   usa STARTTLS.
+
 ## 3. Push a GitHub
 
 Si todavía no existe el repo remoto, creá uno privado (desde la web de
