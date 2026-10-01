@@ -51,25 +51,16 @@ function Chat({ sessionId }: { sessionId: string }) {
                 className="h-10 w-10 flex-none object-contain"
               />
               <div className="min-w-0">
-                <p className="text-base font-extrabold text-white">Macacha</p>
-                <p className="truncate text-sm text-white/60">
+                <p className="truncate text-base font-extrabold text-white">Macacha</p>
+                <p className="hidden truncate text-sm text-white/60 sm:block">
                   Asistente virtual del Gobierno de Salta
                 </p>
               </div>
             </div>
-            <div className="flex flex-none items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPanelAbierto(true)}
-                className="boton-neutro min-[1051px]:hidden"
-              >
-                Ficha del trámite
-              </button>
-              <span className="inline-flex flex-none items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-white/85">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Activa
-              </span>
-            </div>
+            <span className="inline-flex flex-none items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-white/85">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="max-[479px]:sr-only">Activa</span>
+            </span>
           </header>
 
           <div className="scroll-chat flex-1 space-y-3 overflow-y-auto p-5">
@@ -90,7 +81,11 @@ function Chat({ sessionId }: { sessionId: string }) {
             ))}
             {enviando && <p className="text-sm texto-secundario">escribiendo…</p>}
           </div>
-          <ChatInput disabled={enviando} onEnviar={enviarMensaje} />
+          <ChatInput
+            disabled={enviando}
+            onEnviar={enviarMensaje}
+            onAbrirFicha={() => setPanelAbierto(true)}
+          />
         </div>
 
         <PanelContextual
