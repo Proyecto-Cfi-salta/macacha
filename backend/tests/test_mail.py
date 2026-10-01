@@ -14,7 +14,10 @@ def test_enviar_mail_usa_configuracion_del_entorno(monkeypatch):
     smtp_instance = MagicMock()
     smtp_instance.__enter__.return_value = smtp_instance
 
-    with patch("agent.mail.smtplib.SMTP", return_value=smtp_instance) as smtp_cls:
+    contexto = object()
+    with patch("agent.mail.smtplib.SMTP", return_value=smtp_instance) as smtp_cls, patch(
+        "ssl.create_default_context", return_value=contexto
+    ):
         mail.enviar_mail(
             ["admin@ejemplo.com", "otro@ejemplo.com"],
             asunto="Nueva consulta de Juan",
@@ -22,7 +25,7 @@ def test_enviar_mail_usa_configuracion_del_entorno(monkeypatch):
         )
 
     smtp_cls.assert_called_once_with("smtp.ejemplo.com", 587, timeout=10)
-    smtp_instance.starttls.assert_called_once()
+    smtp_instance.starttls.assert_called_once_with(context=contexto)
     smtp_instance.login.assert_called_once_with("usuario@ejemplo.com", "secreta")
 
     assert smtp_instance.send_message.call_count == 1
@@ -63,13 +66,14 @@ def _smtp_falso():
 def test_enviar_mail_en_puerto_465_usa_ssl_implicito_sin_starttls(monkeypatch):
     _configurar_smtp(monkeypatch, 465)
     smtp_ssl = _smtp_falso()
+    contexto = object()
 
     with patch("agent.mail.smtplib.SMTP_SSL", return_value=smtp_ssl) as ssl_cls, patch(
         "agent.mail.smtplib.SMTP"
-    ) as smtp_cls:
+    ) as smtp_cls, patch("ssl.create_default_context", return_value=contexto):
         mail.enviar_mail(["admin@ejemplo.com"], asunto="Asunto", cuerpo_texto="Cuerpo")
 
-    ssl_cls.assert_called_once_with("smtp.ejemplo.com", 465, timeout=10)
+    ssl_cls.assert_called_once_with("smtp.ejemplo.com", 465, timeout=10, context=contexto)
     smtp_cls.assert_not_called()
     smtp_ssl.starttls.assert_not_called()
     smtp_ssl.login.assert_called_once_with("usuario@ejemplo.com", "secreta")
@@ -79,13 +83,14 @@ def test_enviar_mail_en_puerto_465_usa_ssl_implicito_sin_starttls(monkeypatch):
 def test_enviar_mail_en_puerto_587_sigue_usando_starttls(monkeypatch):
     _configurar_smtp(monkeypatch, 587)
     smtp = _smtp_falso()
+    contexto = object()
 
     with patch("agent.mail.smtplib.SMTP", return_value=smtp) as smtp_cls, patch(
         "agent.mail.smtplib.SMTP_SSL"
-    ) as ssl_cls:
+    ) as ssl_cls, patch("ssl.create_default_context", return_value=contexto):
         mail.enviar_mail(["admin@ejemplo.com"], asunto="Asunto", cuerpo_texto="Cuerpo")
 
     smtp_cls.assert_called_once_with("smtp.ejemplo.com", 587, timeout=10)
     ssl_cls.assert_not_called()
-    smtp.starttls.assert_called_once()
+    smtp.starttls.assert_called_once_with(context=contexto)
     assert smtp.send_message.call_count == 1

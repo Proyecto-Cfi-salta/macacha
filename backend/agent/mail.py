@@ -1,5 +1,6 @@
 import os
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 PUERTO_SSL_IMPLICITO = 465
@@ -18,13 +19,14 @@ def enviar_mail(destinatarios: list[str], asunto: str, cuerpo_texto: str) -> Non
     host = os.environ["SMTP_HOST"]
     port = int(os.environ["SMTP_PORT"])
     ssl_implicito = port == PUERTO_SSL_IMPLICITO
+    contexto = ssl.create_default_context()
     conexion = (
-        smtplib.SMTP_SSL(host, port, timeout=10)
+        smtplib.SMTP_SSL(host, port, timeout=10, context=contexto)
         if ssl_implicito
         else smtplib.SMTP(host, port, timeout=10)
     )
     with conexion as smtp:
         if not ssl_implicito:
-            smtp.starttls()
+            smtp.starttls(context=contexto)
         smtp.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
         smtp.send_message(mensaje)
