@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { MensajeAdmin } from "../lib/admin-api";
 import { extraerDetalleToolCalls } from "../lib/admin-chats";
+import { textoMotivo, type FeedbackVoto } from "../lib/feedback";
 import { BurbujaMensaje } from "./BurbujaMensaje";
 
 export function ConversacionChat({ mensajes }: { mensajes: MensajeAdmin[] }) {
@@ -17,6 +18,9 @@ export function ConversacionChat({ mensajes }: { mensajes: MensajeAdmin[] }) {
             <span className="mt-1 inline-block rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600">
               {mensaje.proveedor === "gemini" ? "Gemini" : "OpenAI"}
             </span>
+          )}
+          {mensaje.rol === "assistant" && mensaje.feedback && (
+            <FeedbackAdmin feedback={mensaje.feedback} />
           )}
           {mensaje.rol === "assistant" && mensaje.tool_calls && mensaje.tool_calls.length > 0 && (
             <DetalleTecnico mensaje={mensaje} todosLosMensajes={mensajes} />
@@ -55,6 +59,19 @@ function DetalleTecnico({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function FeedbackAdmin({ feedback }: { feedback: FeedbackVoto }) {
+  const motivo = textoMotivo(feedback.motivo);
+  return (
+    <div className="mt-2 rounded border border-gray-300 bg-white p-2 text-xs">
+      <p className="font-semibold">
+        {feedback.util ? "👍 Le sirvió" : "👎 No le sirvió"}
+        {motivo ? ` · ${motivo}` : ""}
+      </p>
+      {feedback.comentario && <p className="mt-1 whitespace-pre-wrap">{feedback.comentario}</p>}
     </div>
   );
 }

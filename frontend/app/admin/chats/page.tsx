@@ -57,6 +57,7 @@ export default function ChatsPage() {
             <th className="p-2">Mensajes</th>
             <th className="p-2">Último mensaje</th>
             <th className="p-2">Trámites citados</th>
+            <th className="p-2">Feedback</th>
           </tr>
         </thead>
         <tbody>
@@ -81,6 +82,11 @@ export default function ChatsPage() {
                     {id}
                   </span>
                 ))}
+              </td>
+              <td className="p-2 whitespace-nowrap">
+                {sesion.votos_positivos + sesion.votos_negativos === 0
+                  ? "—"
+                  : `👍 ${sesion.votos_positivos} · 👎 ${sesion.votos_negativos}`}
               </td>
             </tr>
           ))}

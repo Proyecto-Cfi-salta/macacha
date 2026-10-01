@@ -1,3 +1,5 @@
+import type { FeedbackVoto } from "./feedback";
+
 export type ToolCall = {
   id: string;
   type: "function";
@@ -11,6 +13,8 @@ export type MensajeAdmin = {
   tool_call_id?: string;
   proveedor?: string;
   creado_en: string;
+  id?: string;
+  feedback?: FeedbackVoto | null;
 };
 
 export type SesionResumen = {
@@ -19,6 +23,8 @@ export type SesionResumen = {
   cantidad_mensajes: number;
   ultimo_mensaje: string | null;
   tramites_citados: string[];
+  votos_positivos: number;
+  votos_negativos: number;
 };
 
 export type ListaSesiones = {
