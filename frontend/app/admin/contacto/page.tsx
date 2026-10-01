@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { CasillasContacto } from "../../../components/CasillasContacto";
 import { listarSolicitudesContacto, type SolicitudContacto } from "../../../lib/admin-contacto-api";
 
 export default function ContactoPage() {
@@ -44,6 +45,7 @@ export default function ContactoPage() {
   return (
     <div className="p-4">
       <h1 className="mb-4 text-lg font-semibold">Contacto</h1>
+      <CasillasContacto />
       {solicitudes && solicitudes.length === 0 ? (
         <p className="text-sm texto-secundario">Todavía no hay solicitudes de contacto</p>
       ) : (
