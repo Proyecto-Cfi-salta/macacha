@@ -1,5 +1,3 @@
-import psycopg
-import pytest
 
 from ingest import repository as repo
 from agent.admin import tramites_repository
@@ -82,22 +80,6 @@ def test_obtener_organismo_id_por_nombre(db_conn, clean_db):
 
     assert tramites_repository.obtener_organismo_id_por_nombre(db_conn, "Registro Civil") == organismo_id
     assert tramites_repository.obtener_organismo_id_por_nombre(db_conn, "No existe") is None
-
-
-def test_crear_organismo_devuelve_id(db_conn, clean_db):
-    organismo_id = tramites_repository.crear_organismo(db_conn, "Nuevo Organismo")
-    db_conn.commit()
-
-    assert tramites_repository.obtener_nombre_organismo(db_conn, organismo_id) == "Nuevo Organismo"
-
-
-def test_crear_organismo_con_nombre_repetido_lanza_unique_violation(db_conn, clean_db):
-    tramites_repository.crear_organismo(db_conn, "Registro Civil")
-    db_conn.commit()
-
-    with pytest.raises(psycopg.errors.UniqueViolation):
-        tramites_repository.crear_organismo(db_conn, "Registro Civil")
-    db_conn.rollback()
 
 
 def test_obtener_chunks_por_version_incluye_embedding(db_conn, clean_db):

@@ -355,6 +355,8 @@ def test_crear_tramite_payload_invalido_devuelve_422(db_conn, clean_db, monkeypa
 
 def test_crear_tramite_exitoso_genera_id_y_version_uno(db_conn, clean_db, monkeypatch):
     monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    repo.upsert_organismo(db_conn, "Registro Civil")
+    db_conn.commit()
     payload = {
         "organismo": "Registro Civil",
         "categoria": "Actas",
@@ -705,3 +707,61 @@ def test_editar_tramite_admin_organismo_sin_version_vigente_devuelve_404(db_conn
         api.app.dependency_overrides.clear()
 
     assert respuesta.status_code == 404
+
+
+def _contar(conn, tabla):
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) FROM {tabla}")
+        return cur.fetchone()[0]
+
+
+def test_crear_tramite_con_organismo_inexistente_devuelve_422_y_no_crea_nada(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    payload = _payload_edicion(organismo="Organismo Nuevo", nombre_oficial="Trámite Nuevo")
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    api.app.dependency_overrides[api.obtener_openai_client] = lambda: _FakeOpenAIClient()
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.post("/admin/tramites", json=payload)
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 422
+    assert "Organismo Nuevo" in respuesta.json()["detail"]
+    assert _contar(db_conn, "organismos") == 0
+    assert _contar(db_conn, "tramites") == 0
+
+
+def test_editar_tramite_con_organismo_inexistente_devuelve_422_y_no_lo_crea(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    organismo_id = repo.upsert_organismo(db_conn, "Registro Civil")
+    repo.upsert_tramite(db_conn, "RC-0001", organismo_id, "Actas", "Actas Regulares")
+    snapshot = _payload_edicion()
+    snapshot.update({"id": "RC-0001", "faq_generadas_automaticamente": False})
+    repo.insert_version_with_chunks(
+        db_conn,
+        "RC-0001",
+        1,
+        compute_content_hash(snapshot),
+        snapshot,
+        [{"tipo_chunk": "descripcion", "texto": "texto", "fuente_url": None}],
+        [[0.0] * 1536],
+    )
+    db_conn.commit()
+
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    api.app.dependency_overrides[api.obtener_openai_client] = lambda: _FakeOpenAIClient()
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        respuesta = client.put(
+            "/admin/tramites/RC-0001", json=_payload_edicion(organismo="Organismo Nuevo")
+        )
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 422
+    assert _contar(db_conn, "organismos") == 1
+    assert repo.get_vigente_version(db_conn, "RC-0001")["numero_version"] == 1

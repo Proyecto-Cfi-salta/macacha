@@ -372,6 +372,13 @@ def _verificar_payload_de_mi_organismo(conn, admin: AdminActual, organismo_paylo
         )
 
 
+def _verificar_organismo_existente(conn, nombre: str) -> None:
+    if admin_tramites_repository.obtener_organismo_id_por_nombre(conn, nombre) is None:
+        raise HTTPException(
+            status_code=422, detail=f"El organismo '{nombre}' no existe. Elegí uno de la lista."
+        )
+
+
 @app.get("/admin/tramites/{tramite_id}")
 def admin_obtener_tramite(
     tramite_id: str, admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)
@@ -442,6 +449,8 @@ def admin_editar_tramite(
         if obtener_snapshot_vigente(conn, tramite_id) is None:
             raise HTTPException(status_code=404, detail="Trámite no encontrado")
 
+        _verificar_organismo_existente(conn, request.organismo)
+
         try:
             resultado = admin_tramite_editor.editar_tramite(
                 conn, tramite_id, request.model_dump(), openai_client.generate_embeddings
@@ -465,6 +474,7 @@ def admin_crear_tramite(
 ):
     with pool.connection() as conn:
         _verificar_payload_de_mi_organismo(conn, admin, request.organismo)
+        _verificar_organismo_existente(conn, request.organismo)
         try:
             resultado = admin_tramite_editor.crear_tramite(
                 conn, request.model_dump(), openai_client.generate_embeddings
@@ -491,10 +501,6 @@ class UsuarioEdicionPayload(BaseModel):
     organismo_id: int | None = None
     activo: bool
     password: str | None = Field(default=None, min_length=8)
-
-
-class OrganismoPayload(BaseModel):
-    nombre: str = Field(min_length=1)
 
 
 def _validar_consistencia_rol_organismo(rol: str, organismo_id: int | None) -> None:
@@ -551,20 +557,6 @@ def admin_editar_usuario(
         )
         conn.commit()
     return {"ok": True}
-
-
-@app.post("/admin/organismos")
-def admin_crear_organismo(
-    request: OrganismoPayload,
-    admin: AdminActual = Depends(requiere_super_admin),
-    pool=Depends(obtener_pool),
-):
-    with pool.connection() as conn:
-        if admin_tramites_repository.obtener_organismo_id_por_nombre(conn, request.nombre) is not None:
-            raise HTTPException(status_code=409, detail="Ya existe un organismo con ese nombre")
-        organismo_id = admin_tramites_repository.crear_organismo(conn, request.nombre)
-        conn.commit()
-    return {"id": organismo_id, "nombre": request.nombre}
 
 
 class ContactoEstadoPayload(BaseModel):

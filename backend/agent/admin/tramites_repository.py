@@ -53,12 +53,6 @@ def obtener_organismo_id_por_nombre(conn, nombre: str) -> int | None:
         return fila[0] if fila else None
 
 
-def crear_organismo(conn, nombre: str) -> int:
-    with conn.cursor() as cur:
-        cur.execute("INSERT INTO organismos (nombre) VALUES (%s) RETURNING id", (nombre,))
-        return cur.fetchone()[0]
-
-
 def obtener_chunks_por_version(conn, version_id: str) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(

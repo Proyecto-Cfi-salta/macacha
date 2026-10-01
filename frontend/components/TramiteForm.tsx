@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { ListaFAQ } from "./ListaFAQ";
 import { ListaTextos } from "./ListaTextos";
 import type { Organismo, TramiteDetalleAdmin } from "../lib/admin-tramites-api";
+import { puedeGuardarTramite } from "../lib/tramite-form";
 
 export function TramiteForm({
   valoresIniciales,
@@ -21,9 +22,6 @@ export function TramiteForm({
   onGuardar: (datos: TramiteDetalleAdmin) => void;
 }) {
   const [datos, setDatos] = useState<TramiteDetalleAdmin>(valoresIniciales);
-  const [organismoEsNuevo, setOrganismoEsNuevo] = useState(
-    !organismosExistentes.some((o) => o.nombre === valoresIniciales.organismo)
-  );
 
   function actualizar<K extends keyof TramiteDetalleAdmin>(campo: K, valor: TramiteDetalleAdmin[K]) {
     setDatos((anterior) => ({ ...anterior, [campo]: valor }));
@@ -35,7 +33,11 @@ export function TramiteForm({
   }
 
   const organismoEfectivo = organismoFijo ?? datos.organismo;
-  const puedeGuardar = organismoEfectivo.trim() !== "" && datos.nombre_oficial.trim() !== "";
+  const puedeGuardar = puedeGuardarTramite({
+    organismo: organismoEfectivo,
+    nombreOficial: datos.nombre_oficial,
+    organismosExistentes: organismosExistentes.map((o) => o.nombre),
+  });
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-4 p-4">
@@ -43,34 +45,21 @@ export function TramiteForm({
         <label className="campo-label">Organismo</label>
         {organismoFijo ? (
           <input type="text" value={organismoFijo} disabled className="campo-input w-full" />
-        ) : organismoEsNuevo ? (
-          <input
-            type="text"
-            value={datos.organismo}
-            onChange={(e) => actualizar("organismo", e.target.value)}
-            className="campo-input w-full"
-          />
         ) : (
           <select
             value={datos.organismo}
             onChange={(e) => actualizar("organismo", e.target.value)}
             className="campo-input w-full"
           >
+            <option value="" disabled>
+              Elegí un organismo…
+            </option>
             {organismosExistentes.map((organismo) => (
               <option key={organismo.id} value={organismo.nombre}>
                 {organismo.nombre}
               </option>
             ))}
           </select>
-        )}
-        {!organismoFijo && (
-          <button
-            type="button"
-            onClick={() => setOrganismoEsNuevo(!organismoEsNuevo)}
-            className="boton-secundario mt-1"
-          >
-            {organismoEsNuevo ? "Elegir uno existente" : "Otro… (crear nuevo)"}
-          </button>
         )}
       </div>
 

@@ -204,23 +204,7 @@ def test_editar_usuario_desactiva(db_conn, clean_db, monkeypatch):
     assert editado["activo"] is False
 
 
-def test_crear_organismo_requiere_super_admin(db_conn, clean_db, monkeypatch):
-    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
-    organismo_id = _crear_organismo(db_conn, "Registro Civil")
-    db_conn.commit()
-
-    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
-    client = TestClient(api.app, base_url="https://testserver")
-    try:
-        _crear_admin_y_loguear(client, db_conn, rol="admin_organismo", organismo_id=organismo_id)
-        respuesta = client.post("/admin/organismos", json={"nombre": "Rentas"})
-    finally:
-        api.app.dependency_overrides.clear()
-
-    assert respuesta.status_code == 403
-
-
-def test_crear_organismo_exitoso(db_conn, clean_db, monkeypatch):
+def test_post_organismos_ya_no_esta_disponible(db_conn, clean_db, monkeypatch):
     monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
 
     api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
@@ -231,21 +215,7 @@ def test_crear_organismo_exitoso(db_conn, clean_db, monkeypatch):
     finally:
         api.app.dependency_overrides.clear()
 
-    assert respuesta.status_code == 200
-    assert respuesta.json()["nombre"] == "Rentas"
-
-
-def test_crear_organismo_nombre_duplicado_devuelve_409(db_conn, clean_db, monkeypatch):
-    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
-    _crear_organismo(db_conn, "Rentas")
-    db_conn.commit()
-
-    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
-    client = TestClient(api.app, base_url="https://testserver")
-    try:
-        _crear_admin_y_loguear(client, db_conn)
-        respuesta = client.post("/admin/organismos", json={"nombre": "Rentas"})
-    finally:
-        api.app.dependency_overrides.clear()
-
-    assert respuesta.status_code == 409
+    assert respuesta.status_code == 405
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM organismos")
+        assert cur.fetchone()[0] == 0

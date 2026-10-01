@@ -55,13 +55,3 @@ export async function editarUsuario(id: string, datos: UsuarioFormValores): Prom
   });
   await parsearOLanzar(respuesta, "No se pudo editar el usuario");
 }
-
-export async function crearOrganismo(nombre: string): Promise<Organismo> {
-  const respuesta = await fetch(`${BASE_URL}/admin/organismos`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ nombre }),
-  });
-  return parsearOLanzar(respuesta, "No se pudo crear el organismo");
-}

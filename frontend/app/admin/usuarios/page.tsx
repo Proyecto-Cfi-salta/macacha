@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { UsuarioForm } from "../../../components/UsuarioForm";
 import { listarOrganismos, type Organismo } from "../../../lib/admin-tramites-api";
 import {
-  crearOrganismo,
   crearUsuario,
   editarUsuario,
   obtenerUsuarios,
@@ -28,8 +27,6 @@ export default function UsuariosPage() {
   const [editando, setEditando] = useState<AdminUsuario | "nuevo" | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
-  const [nombreOrganismoNuevo, setNombreOrganismoNuevo] = useState("");
-  const [errorOrganismo, setErrorOrganismo] = useState<string | null>(null);
 
   useEffect(() => {
     cargar();
@@ -49,18 +46,6 @@ export default function UsuariosPage() {
       setError(true);
     } finally {
       setCargando(false);
-    }
-  }
-
-  async function handleCrearOrganismo() {
-    if (!nombreOrganismoNuevo.trim()) return;
-    setErrorOrganismo(null);
-    try {
-      await crearOrganismo(nombreOrganismoNuevo.trim());
-      setNombreOrganismoNuevo("");
-      setOrganismos(await listarOrganismos());
-    } catch (err) {
-      setErrorOrganismo(err instanceof Error ? err.message : "No se pudo crear el organismo");
     }
   }
 
@@ -114,25 +99,6 @@ export default function UsuariosPage() {
         <button onClick={() => setEditando("nuevo")} className="boton-primario">
           Nuevo usuario
         </button>
-      </div>
-
-      <div className="mb-4 flex items-end gap-2">
-        <div>
-          <label className="campo-label">Nuevo organismo</label>
-          <input
-            type="text"
-            value={nombreOrganismoNuevo}
-            onChange={(e) => setNombreOrganismoNuevo(e.target.value)}
-            className="campo-input"
-          />
-        </div>
-        <button
-          onClick={handleCrearOrganismo}
-          className="rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300"
-        >
-          Crear organismo
-        </button>
-        {errorOrganismo && <p className="text-sm texto-error">{errorOrganismo}</p>}
       </div>
 
       {editando && (
