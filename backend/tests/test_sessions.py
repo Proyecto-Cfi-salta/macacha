@@ -96,3 +96,16 @@ def test_guardar_mensaje_sin_proveedor_persiste_null(db_conn, clean_db):
     with db_conn.cursor() as cur:
         cur.execute("SELECT proveedor FROM mensajes WHERE session_id = %s", (session_id,))
         assert cur.fetchone()[0] is None
+
+
+def test_guardar_mensaje_devuelve_el_id_del_mensaje_insertado(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    sessions.crear_sesion_si_no_existe(db_conn, session_id)
+
+    mensaje_id = sessions.guardar_mensaje(db_conn, session_id, rol="assistant", contenido="hola")
+    db_conn.commit()
+
+    assert isinstance(mensaje_id, str)
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT contenido FROM mensajes WHERE id = %s", (mensaje_id,))
+        assert cur.fetchone()[0] == "hola"

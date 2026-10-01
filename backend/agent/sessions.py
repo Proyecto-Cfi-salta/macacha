@@ -17,12 +17,13 @@ def guardar_mensaje(
     tool_calls: list[dict] | None = None,
     tool_call_id: str | None = None,
     proveedor: str | None = None,
-) -> None:
+) -> str:
     with conn.cursor() as cur:
         cur.execute(
             """
             INSERT INTO mensajes (session_id, rol, contenido, tool_calls, tool_call_id, proveedor)
             VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 session_id,
@@ -33,6 +34,7 @@ def guardar_mensaje(
                 proveedor,
             ),
         )
+        return str(cur.fetchone()[0])
 
 
 def obtener_historial(conn, session_id: str) -> list[dict]:
