@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from agent import mail, sessions
+from agent import feedback, mail, sessions
 from agent.admin import chats_repository as admin_chats_repository
 from agent.admin import contacto_repository
 from agent.admin import repository as admin_repository
@@ -205,6 +205,37 @@ def crear_solicitud_contacto(request: ContactoPayload, pool=Depends(obtener_pool
     except Exception:
         logger.exception("Falló el envío de mail de contacto para la solicitud %s", solicitud_id)
 
+    return {"ok": True}
+
+
+class FeedbackRequest(BaseModel):
+    session_id: uuid.UUID
+    mensaje_id: uuid.UUID
+    util: bool
+    motivo: feedback.MotivoFeedback | None = None
+    comentario: str | None = Field(default=None, max_length=500)
+
+
+@app.post("/feedback")
+def registrar_feedback(request: FeedbackRequest, pool=Depends(obtener_pool)):
+    comentario = (request.comentario or "").strip() or None
+    if request.util and (request.motivo is not None or comentario is not None):
+        raise HTTPException(
+            status_code=422, detail="El motivo y el comentario solo aplican a un voto negativo"
+        )
+
+    with pool.connection() as conn:
+        if not feedback.mensaje_votable(conn, str(request.session_id), str(request.mensaje_id)):
+            raise HTTPException(status_code=404, detail="Respuesta no encontrada")
+        feedback.guardar_voto(
+            conn,
+            str(request.session_id),
+            str(request.mensaje_id),
+            request.util,
+            request.motivo,
+            comentario,
+        )
+        conn.commit()
     return {"ok": True}
 
 
