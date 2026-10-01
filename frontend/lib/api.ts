@@ -1,7 +1,12 @@
+import type { FeedbackVoto } from "./feedback";
+
 export type MensajeVisible = {
+  id: string;
   rol: "user" | "assistant";
   contenido: string;
   creado_en: string;
+  votable: boolean;
+  feedback: FeedbackVoto | null;
 };
 
 export type TramiteDetalle = {
