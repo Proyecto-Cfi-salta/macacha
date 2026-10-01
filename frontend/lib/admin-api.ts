@@ -98,3 +98,31 @@ export async function obtenerSesion(id: string): Promise<MensajeAdmin[] | null> 
   }
   return respuesta.json();
 }
+
+export type MetricasFeedback = {
+  total: number;
+  positivos: number;
+  negativos: number;
+  porcentaje_util: number | null;
+  motivos: { motivo: string; cantidad: number }[];
+  sin_motivo: number;
+  por_dia: { fecha: string; positivos: number; negativos: number }[];
+  comentarios_recientes: {
+    session_id: string;
+    mensaje_id: string;
+    motivo: string | null;
+    comentario: string;
+    creado_en: string;
+  }[];
+  por_organismo: { organismo: string; positivos: number; negativos: number }[];
+};
+
+export async function obtenerMetricasFeedback(): Promise<MetricasFeedback> {
+  const respuesta = await fetch(`${BASE_URL}/admin/feedback/metricas`, {
+    credentials: "include",
+  });
+  if (!respuesta.ok) {
+    throw new Error("No se pudieron cargar las métricas de feedback");
+  }
+  return respuesta.json();
+}

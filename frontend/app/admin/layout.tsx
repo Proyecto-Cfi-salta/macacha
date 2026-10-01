@@ -64,6 +64,11 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 Contacto
               </ItemNav>
             </li>
+            <li>
+              <ItemNav href="/admin/feedback" pathname={pathname} icono="★">
+                Feedback
+              </ItemNav>
+            </li>
             {admin?.rol === "super_admin" && (
               <li>
                 <ItemNav href="/admin/usuarios" pathname={pathname} icono="⚇">
