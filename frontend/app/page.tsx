@@ -68,6 +68,8 @@ function Chat({ sessionId }: { sessionId: string }) {
               <ChatMessage
                 key={indice}
                 mensaje={mensaje}
+                sessionId={sessionId}
+                mostrarFeedback={!enviando}
                 onReintentar={
                   mensaje.error && !enviando
                     ? () => {

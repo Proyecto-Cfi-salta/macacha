@@ -1,12 +1,17 @@
 import type { Mensaje } from "../hooks/useChatStream";
 import { BurbujaMensaje } from "./BurbujaMensaje";
+import { FeedbackRespuesta } from "./FeedbackRespuesta";
 
 export function ChatMessage({
   mensaje,
+  sessionId,
+  mostrarFeedback,
   onReintentar,
   onPedirContacto,
 }: {
   mensaje: Mensaje;
+  sessionId: string;
+  mostrarFeedback: boolean;
   onReintentar?: () => void;
   onPedirContacto?: () => void;
 }) {
@@ -43,6 +48,18 @@ export function ChatMessage({
           ¿Querés que te ayude una persona? Completá este formulario
         </button>
       )}
+      {mostrarFeedback &&
+        !esUsuario &&
+        !mensaje.error &&
+        mensaje.votable &&
+        mensaje.id &&
+        mensaje.contenido && (
+          <FeedbackRespuesta
+            sessionId={sessionId}
+            mensajeId={mensaje.id}
+            feedbackInicial={mensaje.feedback}
+          />
+        )}
       {mensaje.error && onReintentar && (
         <button onClick={onReintentar} className="texto-error mt-2 text-sm underline">
           Reintentar
