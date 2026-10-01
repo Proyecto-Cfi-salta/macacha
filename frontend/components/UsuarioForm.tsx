@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import type { Organismo } from "../lib/admin-tramites-api";
 import type { UsuarioFormValores } from "../lib/admin-usuarios-api";
+import { CampoContrasena } from "./CampoContrasena";
 
 export function UsuarioForm({
   valoresIniciales,
@@ -54,8 +55,7 @@ export function UsuarioForm({
         <label className="campo-label">
           {esEdicion ? "Nueva contraseña (dejar en blanco para no cambiar)" : "Contraseña"}
         </label>
-        <input
-          type="password"
+        <CampoContrasena
           value={datos.password}
           onChange={(e) => actualizar("password", e.target.value)}
           className="campo-input w-full"

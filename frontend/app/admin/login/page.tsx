@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { login } from "../../../lib/admin-api";
+import { CampoContrasena } from "../../../components/CampoContrasena";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -42,8 +43,7 @@ export default function LoginPage() {
             className="campo-input w-full"
             required
           />
-          <input
-            type="password"
+          <CampoContrasena
             placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
