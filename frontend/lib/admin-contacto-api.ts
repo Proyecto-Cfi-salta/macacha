@@ -58,3 +58,37 @@ export async function editarEstadoContacto(
     throw new Error("No se pudo actualizar el estado");
   }
 }
+
+export type Casilla = {
+  id: number;
+  nombre: string;
+  email_contacto: string | null;
+};
+
+export async function listarCasillas(): Promise<Casilla[]> {
+  const respuesta = await fetch(`${BASE_URL}/admin/contacto/casillas`, { credentials: "include" });
+  if (!respuesta.ok) {
+    throw new Error("No se pudieron cargar las casillas de contacto");
+  }
+  return respuesta.json();
+}
+
+export async function guardarCasilla(organismoId: number, email: string | null): Promise<Casilla> {
+  const respuesta = await fetch(`${BASE_URL}/admin/contacto/casillas/${organismoId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email_contacto: email }),
+  });
+  if (!respuesta.ok) {
+    let mensaje = "No se pudo guardar la casilla";
+    try {
+      const cuerpo = await respuesta.json();
+      if (typeof cuerpo.detail === "string") mensaje = cuerpo.detail;
+    } catch {
+      // el cuerpo no era JSON: se usa el mensaje genérico
+    }
+    throw new Error(mensaje);
+  }
+  return respuesta.json();
+}
