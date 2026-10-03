@@ -106,8 +106,8 @@ el proxy más cercano y que el cliente no puede falsificar. Si el encabezado no 
 - **Mientras graba o transcribe**, el campo y "Enviar" quedan deshabilitados.
 - **Errores** con mensajes en voseo y un botón "Cerrar aviso"; si falló la transcripción y hay grabación,
   "Reintentar".
-- **Privacidad:** al empezar a grabar se muestra "El audio se transcribe con un servicio externo y no se
-  guarda."
+- **Privacidad:** al empezar a grabar se muestra "El audio se envía a un servicio externo para transcribirlo y
+  no queda guardado en Macacha."
 - **Accesibilidad:** `aria-label` y `title` por estado, `aria-live="polite"` para el estado, `role="alert"`
   en errores.
 - **Estilos:** las animaciones usan las utilidades de Tailwind (`animate-pulse`, `animate-spin`); no se agrega
