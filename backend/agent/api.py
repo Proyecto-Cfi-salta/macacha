@@ -2,12 +2,13 @@ import json
 import logging
 import os
 import uuid
-from functools import lru_cache
+from functools import lru_cache, partial
 from typing import Iterator, Literal
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.concurrency import run_in_threadpool
+import anyio
+from anyio import to_thread
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -258,7 +259,9 @@ _FORMATOS_DE_AUDIO = {
     "video/webm",
 }
 
-_AUDIO_MAX_BYTES_POR_DEFECTO = 12 * 1024 * 1024
+_AUDIO_MAX_BYTES_POR_DEFECTO = 4 * 1024 * 1024
+# Hilos propios: un OpenAI lento no debe dejar sin hilos al chat, que comparte el pool por defecto.
+_hilos_audio = anyio.CapacityLimiter(4)
 _limitador_audio = rate_limit.LimitadorPorIP()
 
 
@@ -306,11 +309,14 @@ async def transcribir_audio(request: Request):
         raise HTTPException(status_code=400, detail="El audio está vacío.")
 
     try:
-        resultado = await run_in_threadpool(
-            audio_transcription.transcribe_audio_bytes_detailed,
-            bytes(datos),
-            filename=request.query_params.get("filename") or "consulta-audio",
-            content_type=content_type,
+        resultado = await to_thread.run_sync(
+            partial(
+                audio_transcription.transcribe_audio_bytes_detailed,
+                bytes(datos),
+                filename=request.query_params.get("filename") or "consulta-audio",
+                content_type=content_type,
+            ),
+            limiter=_hilos_audio,
         )
     except ValueError as error:
         raise HTTPException(
@@ -319,7 +325,7 @@ async def transcribir_audio(request: Request):
     except RuntimeError as error:
         if "not_configured" in str(error):
             raise HTTPException(status_code=503, detail="La transcripción de audio no está configurada.") from error
-        logger.error("Falló la transcripción de audio: %s", error)
+        logger.error("Falló la transcripción de audio: %s", error, exc_info=error.__cause__)
         raise HTTPException(status_code=502, detail="No se pudo transcribir el audio en este momento.") from error
     except Exception as error:
         logger.exception("Error inesperado al transcribir audio")

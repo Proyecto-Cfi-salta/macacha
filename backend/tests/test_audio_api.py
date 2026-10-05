@@ -259,3 +259,43 @@ def test_cors_permite_el_preflight_del_audio_desde_el_frontend():
 
     assert r.status_code == 200
     assert r.headers["access-control-allow-origin"] == origen
+
+
+def test_la_transcripcion_usa_un_limite_de_hilos_propio_y_acotado(monkeypatch):
+    tomados = []
+
+    def falso(data, *, filename=None, content_type=None):
+        tomados.append(api._hilos_audio.borrowed_tokens)
+        return _resultado()
+
+    monkeypatch.setattr(audio_transcription, "transcribe_audio_bytes_detailed", falso)
+
+    r = _post()
+
+    assert r.status_code == 200
+    assert tomados == [1]
+    assert api._hilos_audio.total_tokens <= 8
+
+
+def test_el_maximo_por_defecto_rechaza_un_audio_de_5_mib(transcribir):
+    r = _post(contenido=b"x" * (5 * 1024 * 1024))
+
+    assert r.status_code == 413
+    assert transcribir == []
+
+
+def test_el_log_de_un_fallo_del_proveedor_incluye_la_causa_sin_contenido(monkeypatch, caplog):
+    def falso(data, **kw):
+        raise RuntimeError("audio_transcription_failed") from ValueError("cuota agotada")
+
+    monkeypatch.setattr(audio_transcription, "transcribe_audio_bytes_detailed", falso)
+
+    with caplog.at_level(logging.ERROR, logger="agent.api"):
+        r = _post(contenido=b"CONTENIDO-SECRETO")
+
+    texto = " ".join(r.getMessage() for r in caplog.records) + " ".join(
+        str(r.exc_info[1]) for r in caplog.records if r.exc_info
+    )
+    assert r.status_code == 502
+    assert "cuota agotada" in texto
+    assert "CONTENIDO-SECRETO" not in texto

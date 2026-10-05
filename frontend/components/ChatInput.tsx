@@ -3,7 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useMicrophoneRecorder } from "../hooks/useMicrophoneRecorder";
 import { transcribirAudio, type AudioTranscriptionResult } from "../lib/audio-api";
-import { textoAyudaAudio, type EstadoTranscripcion } from "../lib/audio-ui";
+import {
+  combinarTexto,
+  DURACION_MAXIMA_GRABACION_MS,
+  textoAyudaAudio,
+  type EstadoTranscripcion,
+} from "../lib/audio-ui";
 
 export function ChatInput({
   disabled,
@@ -46,7 +51,7 @@ export function ChatInput({
     try {
       const respuesta = await transcribirAudio(grabacion.blob, grabacion.mimeType);
       // La transcripción nunca se envía sola: queda en el campo y la persona decide.
-      setTexto(respuesta.text.trim());
+      setTexto((previo) => combinarTexto(previo, respuesta.text.trim()));
       setResultado(respuesta);
       setTranscripcion(respuesta.review_required ? "review" : "ready");
       microfono.clearRecording();
@@ -65,6 +70,14 @@ export function ChatInput({
     // procesarGrabacion solo usa la grabación correspondiente a este cambio.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [microfono.status, microfono.recording]);
+
+  useEffect(() => {
+    if (microfono.status === "recording" && microfono.elapsedMs >= DURACION_MAXIMA_GRABACION_MS) {
+      microfono.stopRecording();
+    }
+    // stopRecording es estable en la práctica; solo reaccionamos al tiempo transcurrido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [microfono.status, microfono.elapsedMs]);
 
   function enviar() {
     const limpio = texto.trim();

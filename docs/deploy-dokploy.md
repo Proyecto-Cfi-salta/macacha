@@ -91,7 +91,7 @@ Guardá el resultado — se usa en el paso 4.
    backend, **después** el frontend (si el frontend sale antes, el botón del micrófono mostraría "No se pudo
    transcribir el audio"). Usa `OPENAI_API_KEY` y tiene variables opcionales: `AUDIO_TRANSCRIPTION_MODEL`
    (por defecto `gpt-4o-transcribe`), `AUDIO_TRANSCRIPTION_SECONDARY_MODEL` (`gpt-4o-mini-transcribe`),
-   `AUDIO_TRANSCRIPTION_CONSENSUS_THRESHOLD` (`0.66`), `AUDIO_MAX_BYTES` (12 MiB),
+   `AUDIO_TRANSCRIPTION_CONSENSUS_THRESHOLD` (`0.66`), `AUDIO_MAX_BYTES` (4 MiB; el frontend corta la grabación a los 2 minutos),
    `AUDIO_RATE_LIMIT_PER_MINUTE` (6 por IP; `0` lo desactiva) y `AUDIO_PROXY_HOPS` (1: cantidad de proxies
    de confianza delante del backend, para leer la IP real desde `X-Forwarded-For`; si en producción hay más
    de un proxy delante, hay que subirlo). El límite vive en la memoria del proceso: si el backend corre con

@@ -80,7 +80,7 @@ el proxy más cercano y que el cliente no puede falsificar. Si el encabezado no 
 | `AUDIO_TRANSCRIPTION_MODEL` | `gpt-4o-transcribe` | Modelo principal |
 | `AUDIO_TRANSCRIPTION_SECONDARY_MODEL` | `gpt-4o-mini-transcribe` | Segundo modelo para el consenso |
 | `AUDIO_TRANSCRIPTION_CONSENSUS_THRESHOLD` | `0.66` | Puntaje mínimo de consenso |
-| `AUDIO_MAX_BYTES` | `12582912` (12 MiB) | Tamaño máximo del audio |
+| `AUDIO_MAX_BYTES` | `4194304` (4 MiB) | Tamaño máximo del audio (el frontend corta la grabación a los 2 minutos) |
 | `AUDIO_RATE_LIMIT_PER_MINUTE` | `6` | Audios por minuto y por IP; `0` desactiva el límite |
 | `AUDIO_PROXY_HOPS` | `1` | Cantidad de proxies de confianza delante del backend |
 

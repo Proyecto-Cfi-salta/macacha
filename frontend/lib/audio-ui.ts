@@ -4,6 +4,14 @@ export type EstadoTranscripcion = "idle" | "transcribing" | "ready" | "review" |
 export const AVISO_PRIVACIDAD_AUDIO =
   "El audio se envía a un servicio externo para transcribirlo y no queda guardado en Macacha.";
 
+// Las consultas duran segundos: cortar a los dos minutos evita audios enormes (costo) y grabaciones olvidadas.
+export const DURACION_MAXIMA_GRABACION_MS = 120_000;
+
+export function combinarTexto(previo: string, dictado: string): string {
+  const base = previo.trim();
+  return base ? `${base} ${dictado}` : dictado;
+}
+
 export function formatearDuracion(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const minutos = Math.floor(total / 60);

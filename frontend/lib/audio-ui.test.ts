@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   AVISO_PRIVACIDAD_AUDIO,
+  combinarTexto,
+  DURACION_MAXIMA_GRABACION_MS,
   extensionPorMime,
   formatearDuracion,
   textoAyudaAudio,
@@ -98,5 +100,21 @@ describe("textoAyudaAudio", () => {
     const t = textoAyudaAudio({ ...base, microfono: "recording", transcripcion: "review" });
 
     expect(t).toContain("Grabando");
+  });
+});
+
+describe("combinarTexto", () => {
+  it("agrega lo dictado a lo que ya estaba escrito", () => {
+    expect(combinarTexto("Soy de Orán, ", "¿dónde saco el DNI?")).toBe("Soy de Orán, ¿dónde saco el DNI?");
+  });
+
+  it("usa solo lo dictado si el campo estaba vacío", () => {
+    expect(combinarTexto("   ", "Quiero el pasaporte")).toBe("Quiero el pasaporte");
+  });
+});
+
+describe("DURACION_MAXIMA_GRABACION_MS", () => {
+  it("corta la grabación a los dos minutos", () => {
+    expect(DURACION_MAXIMA_GRABACION_MS).toBe(120_000);
   });
 });
