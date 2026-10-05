@@ -7,11 +7,12 @@ from typing import Iterator, Literal
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from agent import feedback, mail, sessions
+from agent import audio_transcription, feedback, mail, rate_limit, sessions
 from agent.admin import chats_repository as admin_chats_repository
 from agent.admin import contacto_repository
 from agent.admin.email_contacto import normalizar_email_contacto
@@ -239,6 +240,92 @@ def registrar_feedback(request: FeedbackRequest, pool=Depends(obtener_pool)):
         )
         conn.commit()
     return {"ok": True}
+
+
+_FORMATOS_DE_AUDIO = {
+    "audio/flac",
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/mp4",
+    "video/mp4",
+    "audio/x-m4a",
+    "audio/m4a",
+    "audio/ogg",
+    "application/ogg",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/webm",
+    "video/webm",
+}
+
+_AUDIO_MAX_BYTES_POR_DEFECTO = 12 * 1024 * 1024
+_limitador_audio = rate_limit.LimitadorPorIP()
+
+
+def _entero_de_entorno(nombre: str, defecto: int) -> int:
+    try:
+        return int(os.environ.get(nombre, defecto))
+    except (TypeError, ValueError):
+        return defecto
+
+
+@app.post("/audio/transcribe")
+async def transcribir_audio(request: Request):
+    ip = rate_limit.ip_cliente(
+        request.headers.get("x-forwarded-for"),
+        request.client.host if request.client else None,
+        _entero_de_entorno("AUDIO_PROXY_HOPS", 1),
+    )
+    limite = _entero_de_entorno("AUDIO_RATE_LIMIT_PER_MINUTE", 6)
+    if limite > 0:
+        espera = _limitador_audio.verificar(ip, limite)
+        if espera is not None:
+            logger.warning("Límite de audio superado para la IP %s", ip)
+            raise HTTPException(
+                status_code=429,
+                detail="Hiciste muchas consultas por voz seguidas. Probá de nuevo en un minuto.",
+                headers={"Retry-After": str(espera)},
+            )
+
+    content_type = (request.headers.get("content-type", "").split(";", 1)[0].strip().lower()) or "audio/webm"
+    if content_type not in _FORMATOS_DE_AUDIO:
+        raise HTTPException(status_code=415, detail="El formato de audio no está permitido.")
+
+    maximo = _entero_de_entorno("AUDIO_MAX_BYTES", _AUDIO_MAX_BYTES_POR_DEFECTO)
+    demasiado_grande = HTTPException(status_code=413, detail="El audio supera el tamaño máximo permitido.")
+    declarado = request.headers.get("content-length")
+    if declarado and declarado.isdigit() and int(declarado) > maximo:
+        raise demasiado_grande
+
+    datos = bytearray()
+    async for parte in request.stream():
+        datos.extend(parte)
+        if len(datos) > maximo:
+            raise demasiado_grande
+    if not datos:
+        raise HTTPException(status_code=400, detail="El audio está vacío.")
+
+    try:
+        resultado = await run_in_threadpool(
+            audio_transcription.transcribe_audio_bytes_detailed,
+            bytes(datos),
+            filename=request.query_params.get("filename") or "consulta-audio",
+            content_type=content_type,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422, detail="No pude obtener una transcripción confiable de ese audio."
+        ) from error
+    except RuntimeError as error:
+        if "not_configured" in str(error):
+            raise HTTPException(status_code=503, detail="La transcripción de audio no está configurada.") from error
+        logger.error("Falló la transcripción de audio: %s", error)
+        raise HTTPException(status_code=502, detail="No se pudo transcribir el audio en este momento.") from error
+    except Exception as error:
+        logger.exception("Error inesperado al transcribir audio")
+        raise HTTPException(status_code=502, detail="No se pudo transcribir el audio en este momento.") from error
+
+    return resultado.to_dict()
 
 
 class LoginRequest(BaseModel):
