@@ -87,6 +87,18 @@ Guardá el resultado — se usa en el paso 4.
    el backend lo soporta desde el arreglo de `enviar_mail`; con otro puerto se
    usa STARTTLS.
 
+   La consulta por voz (`POST /audio/transcribe`) **no cambia la base de datos**. Orden: **primero** el
+   backend, **después** el frontend (si el frontend sale antes, el botón del micrófono mostraría "No se pudo
+   transcribir el audio"). Usa `OPENAI_API_KEY` y tiene variables opcionales: `AUDIO_TRANSCRIPTION_MODEL`
+   (por defecto `gpt-4o-transcribe`), `AUDIO_TRANSCRIPTION_SECONDARY_MODEL` (`gpt-4o-mini-transcribe`),
+   `AUDIO_TRANSCRIPTION_CONSENSUS_THRESHOLD` (`0.66`), `AUDIO_MAX_BYTES` (4 MiB; el frontend corta la grabación a los 2 minutos),
+   `AUDIO_RATE_LIMIT_PER_MINUTE` (6 por IP; `0` lo desactiva) y `AUDIO_PROXY_HOPS` (1: cantidad de proxies
+   de confianza delante del backend, para leer la IP real desde `X-Forwarded-For`; si en producción hay más
+   de un proxy delante, hay que subirlo). El límite vive en la memoria del proceso: si el backend corre con
+   varios procesos, cada uno cuenta aparte. Los audios se envían a OpenAI para transcribirlos y no se guardan
+   en Macacha. El frontend manda `Permissions-Policy: microphone=(self)`; si hay un proxy que agrega ese
+   encabezado con otro valor, el navegador bloqueará el micrófono.
+
 ## 3. Push a GitHub
 
 Si todavía no existe el repo remoto, creá uno privado (desde la web de
