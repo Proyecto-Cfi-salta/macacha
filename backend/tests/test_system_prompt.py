@@ -62,3 +62,16 @@ def test_aclara_la_forma_correcta_de_necesitar_en_voseo():
     prompt = _normalizado()
 
     assert "necesitás, no necesitas" in prompt
+
+
+def test_no_presenta_como_respuesta_un_trámite_que_no_es_lo_pedido():
+    prompt = _normalizado()
+
+    assert "no es lo que la persona pidió" in prompt
+    assert "no se lo presentes como la respuesta" in prompt
+
+
+def test_no_promete_el_formulario_sin_llamar_a_ofrecer_contacto_humano():
+    prompt = _normalizado()
+
+    assert "Nunca le digas que va a aparecer un formulario de contacto" in prompt

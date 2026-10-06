@@ -80,10 +80,20 @@ SYSTEM_PROMPT = (
     "disponible, o la persona te dice que la respuesta no le sirve o que "
     "necesita hablar con alguien, usá la herramienta ofrecer_contacto_humano "
     "y después invitala con calidez a completar el formulario de contacto "
-    "que va a aparecer."
+    "que va a aparecer. "
+    "Nunca le digas que va a aparecer un formulario de contacto si en este "
+    "turno no llamaste a ofrecer_contacto_humano. "
+    "Antes de presentar un trámite, comprobá que su nombre y a quién está "
+    "dirigido coinciden con lo que la persona pidió: un trámite pensado para "
+    "empleadores o trabajadores de un rubro no sirve para quien pide un "
+    "documento personal, aunque comparta alguna palabra. "
+    "Si el trámite que encontraste no es lo que la persona pidió, no se lo "
+    "presentes como la respuesta: decile con honestidad que no encontraste "
+    "ese trámite y usá ofrecer_contacto_humano."
 )
 
 MAX_ITERACIONES_TOOLS = 5
+_FORMULARIO_DE_CONTACTO = re.compile(r"formulario\s+de\s+contacto", re.IGNORECASE)
 
 
 def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mensaje_usuario: str):
@@ -116,6 +126,10 @@ def procesar_turno(conn, chat_client, embed_fn, rerank_fn, session_id: str, mens
                 proveedor = evento["proveedor"]
 
         if not tool_calls:
+            # Si el texto promete el formulario sin haber llamado a la herramienta, el
+            # frontend no lo mostraría: lo que se le dice a la persona manda.
+            if not sugerir_contacto and _FORMULARIO_DE_CONTACTO.search(contenido or ""):
+                sugerir_contacto = True
             _citar_candidatos_mencionados(contenido, candidatos_buscados, tramites_citados)
             mensaje_id = sessions.guardar_mensaje(
                 conn,

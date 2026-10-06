@@ -583,3 +583,33 @@ def test_fin_por_iteraciones_agotadas_incluye_el_id_del_mensaje_de_cierre(db_con
         id_guardado, contenido = cur.fetchone()
     assert contenido.startswith("No pude resolver tu consulta")
     assert eventos[-1]["mensaje_id"] == str(id_guardado)
+
+
+def test_si_el_texto_invita_al_formulario_de_contacto_se_marca_sugerir_contacto(db_conn, clean_db):
+    # El modelo a veces promete el formulario sin llamar a ofrecer_contacto_humano:
+    # sin la marca, el frontend no lo muestra y la persona queda esperándolo.
+    session_id = str(uuid.uuid4())
+    chat_client = _FakeChatClient(
+        [{"role": "assistant", "content": "Te invito a completar el formulario de contacto que aparece en pantalla.", "tool_calls": None}]
+    )
+
+    eventos = list(
+        procesar_turno(db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "quiero hablar con alguien")
+    )
+    db_conn.commit()
+
+    assert eventos[-1]["sugerir_contacto"] is True
+
+
+def test_hablar_de_otro_formulario_no_marca_sugerir_contacto(db_conn, clean_db):
+    session_id = str(uuid.uuid4())
+    chat_client = _FakeChatClient(
+        [{"role": "assistant", "content": "Tenés que completar el formulario de inscripción del trámite.", "tool_calls": None}]
+    )
+
+    eventos = list(
+        procesar_turno(db_conn, chat_client, _fake_embed_fn, _fake_rerank_fn, session_id, "cómo me inscribo")
+    )
+    db_conn.commit()
+
+    assert eventos[-1]["sugerir_contacto"] is False
