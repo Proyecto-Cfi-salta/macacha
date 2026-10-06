@@ -7,7 +7,11 @@
     @apply mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200;
   }
   .campo-input {
-    @apply rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500 dark:border-white/20 dark:bg-white/5 dark:text-gray-100 dark:disabled:bg-white/10;
+    @apply rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500 dark:border-white/20 dark:bg-white/5 dark:text-gray-100 dark:disabled:bg-white/10 dark:[color-scheme:dark];
+  }
+  /* La lista desplegable de un <select> la dibuja el navegador: sin esto hereda el texto claro del tema oscuro sobre fondo blanco. */
+  .campo-input option {
+    @apply bg-white text-gray-900 dark:bg-macacha-navy dark:text-gray-100;
   }
   .boton-primario {
     @apply relative rounded bg-gradient-to-r from-macacha-blue via-macacha-pink to-macacha-blue bg-[length:200%_auto] bg-left px-4 py-2 text-sm font-medium text-white transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-right hover:shadow-lg hover:shadow-macacha-blue/40 disabled:translate-y-0 disabled:bg-macacha-blue disabled:bg-none disabled:opacity-50 disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-macacha-blue focus-visible:ring-offset-2 dark:focus-visible:ring-offset-macacha-navy;
