@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { MensajeAdmin } from "../lib/admin-api";
-import { extraerDetalleToolCalls } from "../lib/admin-chats";
+import { etiquetaProveedor, extraerDetalleToolCalls } from "../lib/admin-chats";
 import { textoMotivo, type FeedbackVoto } from "../lib/feedback";
 import { BurbujaMensaje } from "./BurbujaMensaje";
 
@@ -16,7 +16,7 @@ export function ConversacionChat({ mensajes }: { mensajes: MensajeAdmin[] }) {
           <p className="whitespace-pre-wrap">{mensaje.contenido}</p>
           {mensaje.rol === "assistant" && mensaje.proveedor && (
             <span className="mt-1 inline-block rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600">
-              {mensaje.proveedor === "gemini" ? "Gemini" : "OpenAI"}
+              {etiquetaProveedor(mensaje.proveedor)}
             </span>
           )}
           {mensaje.rol === "assistant" && mensaje.feedback && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extraerDetalleToolCalls } from "./admin-chats";
+import { etiquetaProveedor, extraerDetalleToolCalls } from "./admin-chats";
 import type { MensajeAdmin } from "./admin-api";
 
 describe("extraerDetalleToolCalls", () => {
@@ -71,5 +71,15 @@ describe("extraerDetalleToolCalls", () => {
     const detalle = extraerDetalleToolCalls(mensajeAssistant, [mensajeAssistant, toolMsg1, toolMsg2]);
 
     expect(detalle.map((d) => d.resultado)).toEqual(["r1", "r2"]);
+  });
+});
+
+describe("etiquetaProveedor", () => {
+  it("distingue Gemini, OpenAI y las respuestas de prueba", () => {
+    expect(etiquetaProveedor("gemini")).toBe("Gemini");
+    expect(etiquetaProveedor("openai")).toBe("OpenAI");
+    expect(etiquetaProveedor("evaluacion-v3")).toBe("Prueba · v3");
+    expect(etiquetaProveedor("evaluacion-base")).toBe("Prueba · base");
+    expect(etiquetaProveedor("evaluacion-veredicto-v3")).toBe("Verificación · v3");
   });
 });

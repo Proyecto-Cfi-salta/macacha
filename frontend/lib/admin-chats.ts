@@ -24,3 +24,10 @@ export function extraerDetalleToolCalls(
     };
   });
 }
+
+export function etiquetaProveedor(proveedor: string): string {
+  if (proveedor === "gemini") return "Gemini";
+  const prueba = /^evaluacion-(veredicto-)?(.+)$/.exec(proveedor);
+  if (prueba) return `${prueba[1] ? "Verificación" : "Prueba"} · ${prueba[2]}`;
+  return "OpenAI";
+}
