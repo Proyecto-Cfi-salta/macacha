@@ -13,6 +13,8 @@ export type SolicitudContacto = {
   consulta: string;
   estado: "pendiente" | "resuelto";
   creado_en: string;
+  resuelto_por: string | null;
+  resuelto_en: string | null;
 };
 
 export type SolicitudContactoDetalle = SolicitudContacto & {

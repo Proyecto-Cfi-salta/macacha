@@ -426,3 +426,74 @@ def test_listado_rechaza_paginacion_invalida(db_conn, clean_db, monkeypatch, par
         api.app.dependency_overrides.clear()
 
     assert respuesta.status_code == 422
+
+
+def _leer_columnas(db_conn, solicitud_id):
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT estado, resuelto_por_email, resuelto_en FROM solicitudes_contacto WHERE id = %s",
+            (solicitud_id,),
+        )
+        return cur.fetchone()
+
+
+def test_resolver_una_solicitud_registra_quien_la_resolvio_y_cuando(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    organismo = repo.upsert_organismo(db_conn, "Registro Civil")
+    solicitud_id = _crear_solicitud(db_conn, organismo_id=organismo)
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn, rol="admin_organismo", organismo_id=organismo, email="ana@gob.ar")
+        client.put(f"/admin/contacto/{solicitud_id}", json={"estado": "resuelto"})
+        detalle = client.get(f"/admin/contacto/{solicitud_id}").json()
+        lista = _listar(client).json()["solicitudes"]
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert detalle["resuelto_por"] == "ana@gob.ar"
+    assert detalle["resuelto_en"] is not None
+    assert lista[0]["resuelto_por"] == "ana@gob.ar"
+
+
+def test_volver_a_pendiente_borra_quien_resolvio(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    solicitud_id = _crear_solicitud(db_conn)
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        client.put(f"/admin/contacto/{solicitud_id}", json={"estado": "resuelto"})
+        client.put(f"/admin/contacto/{solicitud_id}", json={"estado": "pendiente"})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert _leer_columnas(db_conn, solicitud_id) == ("pendiente", None, None)
+
+
+def test_resolver_de_nuevo_no_pisa_a_quien_la_resolvio_primero(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    solicitud_id = _crear_solicitud(db_conn)
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn, email="primero@gob.ar")
+        client.put(f"/admin/contacto/{solicitud_id}", json={"estado": "resuelto"})
+        client.post("/admin/logout")
+        _crear_admin_y_loguear(client, db_conn, email="segundo@gob.ar")
+        client.put(f"/admin/contacto/{solicitud_id}", json={"estado": "resuelto"})
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert _leer_columnas(db_conn, solicitud_id)[1] == "primero@gob.ar"
+
+
+def test_una_solicitud_resuelta_antes_de_registrar_quien_no_tiene_resolutor(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    solicitud_id = _crear_solicitud(db_conn, estado="resuelto")
+    client = _con_pool(db_conn)
+    try:
+        _crear_admin_y_loguear(client, db_conn)
+        detalle = client.get(f"/admin/contacto/{solicitud_id}").json()
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert detalle["estado"] == "resuelto"
+    assert detalle["resuelto_por"] is None and detalle["resuelto_en"] is None

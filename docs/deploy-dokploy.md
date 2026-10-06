@@ -99,6 +99,13 @@ Guardá el resultado — se usa en el paso 4.
    en Macacha. El frontend manda `Permissions-Policy: microphone=(self)`; si hay un proxy que agrega ese
    encabezado con otro valor, el navegador bloqueará el micrófono.
 
+   La lista de contacto guarda quién resolvió cada solicitud: agrega las
+   columnas `solicitudes_contacto.resuelto_por_email` y `resuelto_en`. Mismo
+   orden obligatorio: **primero** correr el comando de esquema, **después**
+   el backend y por último el frontend. Si el backend sale antes, `GET
+   /admin/contacto` y el detalle devuelven 500 (leen las columnas nuevas). Las
+   solicitudes que ya estaban resueltas muestran "Sin registro".
+
 ## 3. Push a GitHub
 
 Si todavía no existe el repo remoto, creá uno privado (desde la web de

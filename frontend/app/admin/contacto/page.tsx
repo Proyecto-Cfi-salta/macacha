@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CasillasContacto } from "../../../components/CasillasContacto";
+import { quienResolvio } from "../../../lib/admin-contacto-ui";
 import { listarSolicitudesContacto, type PaginaSolicitudesContacto } from "../../../lib/admin-contacto-api";
 
 const POR_PAGINA = 5;
@@ -62,6 +63,7 @@ export default function ContactoPage() {
               <th className="p-2">Trámite</th>
               <th className="p-2">Organismo</th>
               <th className="p-2">Estado</th>
+              <th className="p-2">Resuelto por</th>
             </tr>
           </thead>
           <tbody>
@@ -80,6 +82,14 @@ export default function ContactoPage() {
                 <td className="p-2">{solicitud.organismo ?? "—"}</td>
                 <td className="p-2">
                   {solicitud.estado === "resuelto" ? "Resuelto" : "Pendiente"}
+                </td>
+                <td className="p-2">
+                  {quienResolvio(solicitud) ?? "—"}
+                  {solicitud.resuelto_en && (
+                    <span className="block text-xs texto-secundario">
+                      {new Date(solicitud.resuelto_en).toLocaleString()}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}

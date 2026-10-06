@@ -126,3 +126,6 @@ ALTER TABLE organismos ADD COLUMN IF NOT EXISTS email_contacto TEXT;
 ALTER TABLE organismos DROP CONSTRAINT IF EXISTS organismos_email_contacto_largo;
 ALTER TABLE organismos ADD CONSTRAINT organismos_email_contacto_largo
     CHECK (email_contacto IS NULL OR char_length(email_contacto) <= 254);
+
+ALTER TABLE solicitudes_contacto ADD COLUMN IF NOT EXISTS resuelto_por_email TEXT;
+ALTER TABLE solicitudes_contacto ADD COLUMN IF NOT EXISTS resuelto_en TIMESTAMPTZ;

@@ -8,6 +8,7 @@ import {
   obtenerSolicitudContacto,
   type SolicitudContactoDetalle,
 } from "../../../../lib/admin-contacto-api";
+import { quienResolvio } from "../../../../lib/admin-contacto-ui";
 import { ConversacionChat } from "../../../../components/ConversacionChat";
 
 export default function ContactoDetallePage() {
@@ -37,7 +38,7 @@ export default function ContactoDetallePage() {
     setActualizandoEstado(true);
     try {
       await editarEstadoContacto(solicitud.id, nuevoEstado);
-      setSolicitud({ ...solicitud, estado: nuevoEstado });
+      setSolicitud(await obtenerSolicitudContacto(solicitud.id));
     } catch {
       setError(true);
     } finally {
@@ -78,6 +79,16 @@ export default function ContactoDetallePage() {
         <p><span className="font-semibold">Email:</span> {solicitud.email}</p>
         <p><span className="font-semibold">Teléfono:</span> {solicitud.telefono}</p>
         <p><span className="font-semibold">Trámite:</span> {solicitud.tramite_nombre ?? "—"}</p>
+        <p>
+          <span className="font-semibold">Estado:</span>{" "}
+          {solicitud.estado === "resuelto" ? "Resuelto" : "Pendiente"}
+        </p>
+        {quienResolvio(solicitud) && (
+          <p>
+            <span className="font-semibold">Resuelto por:</span> {quienResolvio(solicitud)}
+            {solicitud.resuelto_en && ` el ${new Date(solicitud.resuelto_en).toLocaleString()}`}
+          </p>
+        )}
         <p className="mt-2"><span className="font-semibold">Consulta:</span></p>
         <p className="whitespace-pre-wrap text-sm">{solicitud.consulta}</p>
         <button

@@ -731,6 +731,9 @@ def admin_editar_estado_contacto(
     with pool.connection() as conn:
         solicitud = contacto_repository.obtener_solicitud(conn, str(solicitud_id))
         _verificar_solicitud_de_mi_organismo(conn, admin, solicitud)
-        contacto_repository.actualizar_estado(conn, str(solicitud_id), request.estado)
+        quien = admin_repository.obtener_admin_por_id(conn, admin.id)
+        contacto_repository.actualizar_estado(
+            conn, str(solicitud_id), request.estado, quien["email"] if quien else None
+        )
         conn.commit()
     return {"ok": True}

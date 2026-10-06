@@ -46,7 +46,8 @@ def resolver_destinatarios(conn, organismo_id: int | None) -> list[str]:
 _SELECT_SOLICITUD = """
     SELECT
         s.id, s.session_id, s.tramite_id, t.nombre_oficial, s.organismo_id, o.nombre,
-        s.nombre, s.email, s.telefono, s.consulta, s.estado, s.creado_en
+        s.nombre, s.email, s.telefono, s.consulta, s.estado, s.creado_en,
+        s.resuelto_por_email, s.resuelto_en
     FROM solicitudes_contacto s
     LEFT JOIN tramites t ON t.id = s.tramite_id
     LEFT JOIN organismos o ON o.id = s.organismo_id
@@ -56,7 +57,7 @@ _SELECT_SOLICITUD = """
 def _fila_a_dict(fila) -> dict:
     (
         id_, session_id, tramite_id, tramite_nombre, organismo_id, organismo,
-        nombre, email, telefono, consulta, estado, creado_en,
+        nombre, email, telefono, consulta, estado, creado_en, resuelto_por, resuelto_en,
     ) = fila
     return {
         "id": str(id_),
@@ -71,6 +72,8 @@ def _fila_a_dict(fila) -> dict:
         "consulta": consulta,
         "estado": estado,
         "creado_en": creado_en.isoformat(),
+        "resuelto_por": resuelto_por,
+        "resuelto_en": resuelto_en.isoformat() if resuelto_en else None,
     }
 
 
@@ -107,11 +110,32 @@ def obtener_solicitud(conn, solicitud_id: str) -> dict | None:
         return _fila_a_dict(fila) if fila else None
 
 
-def actualizar_estado(conn, solicitud_id: str, estado: str) -> None:
+def actualizar_estado(conn, solicitud_id: str, estado: str, resuelto_por: str | None = None) -> None:
+    """Al resolver guarda quién y cuándo; al volver a pendiente lo borra.
+
+    Resolver una solicitud que ya estaba resuelta no cambia a quien la resolvió primero.
+    """
     with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE solicitudes_contacto SET estado = %s WHERE id = %s", (estado, solicitud_id)
-        )
+        if estado == "resuelto":
+            cur.execute(
+                """
+                UPDATE solicitudes_contacto
+                SET estado = 'resuelto',
+                    resuelto_por_email = CASE WHEN estado = 'resuelto' THEN resuelto_por_email ELSE %s END,
+                    resuelto_en = CASE WHEN estado = 'resuelto' THEN resuelto_en ELSE now() END
+                WHERE id = %s
+                """,
+                (resuelto_por, solicitud_id),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE solicitudes_contacto
+                SET estado = %s, resuelto_por_email = NULL, resuelto_en = NULL
+                WHERE id = %s
+                """,
+                (estado, solicitud_id),
+            )
 
 
 def listar_casillas(conn, organismo_id: int | None) -> list[dict]:
