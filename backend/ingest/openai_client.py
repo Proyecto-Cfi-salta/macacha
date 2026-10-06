@@ -2,6 +2,14 @@ import json
 import os
 
 
+def _etiqueta_tramite(candidato: dict) -> str:
+    nombre = candidato.get("nombre_oficial")
+    organismo = candidato.get("organismo")
+    if not nombre or not organismo:
+        return ""
+    return f"[{nombre} · {organismo}] "
+
+
 class OpenAIClient:
     EMBEDDING_MODEL = "text-embedding-3-small"
     FAQ_MODEL_OPENAI = "gpt-4o-mini"
@@ -40,11 +48,15 @@ class OpenAIClient:
 
     def rerank(self, query: str, candidatos: list[dict]) -> list[int]:
         candidatos_numerados = "\n".join(
-            f"{i}. {candidato['texto']}" for i, candidato in enumerate(candidatos)
+            f"{i}. {_etiqueta_tramite(candidato)}{candidato['texto']}"
+            for i, candidato in enumerate(candidatos)
         )
         prompt = (
             "Ordená los siguientes fragmentos por relevancia real a la pregunta del "
-            "usuario, del más relevante al menos relevante.\n\n"
+            "usuario, del más relevante al menos relevante. Cada fragmento indica "
+            "entre corchetes el trámite al que pertenece. Priorizá el trámite cuya "
+            "finalidad coincide exactamente con lo que la persona quiere hacer; un "
+            "trámite solo relacionado, o de otro organismo, debe quedar más abajo.\n\n"
             f"Pregunta: {query}\n\n"
             f"Fragmentos:\n{candidatos_numerados}\n\n"
             'Respondé únicamente con JSON con esta forma: '

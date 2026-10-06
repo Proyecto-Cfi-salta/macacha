@@ -180,3 +180,35 @@ def test_rerank_sin_cliente_gemini_propaga_error_de_openai():
         assert False, "debería haber propagado la excepción"
     except ValueError as exc:
         assert str(exc) == "401 de OpenAI"
+
+
+def _prompt_de_rerank(candidatos, query="una pregunta"):
+    fake_sdk = _FakeOpenAISDK(content=json.dumps({"orden": list(range(len(candidatos)))}))
+    OpenAIClient(fake_sdk).rerank(query, candidatos)
+    return fake_sdk.chat.completions.last_call["messages"][0]["content"]
+
+
+def test_rerank_muestra_el_nombre_y_el_organismo_de_cada_fragmento():
+    prompt = _prompt_de_rerank(
+        [
+            {"texto": "Requisitos: DNI", "nombre_oficial": "Actas Regulares", "organismo": "Registro Civil"},
+            {"texto": "Pasos: pedir turno", "nombre_oficial": "Pasaporte Regular", "organismo": "Registro Civil"},
+        ]
+    )
+
+    assert "0. [Actas Regulares · Registro Civil] Requisitos: DNI" in prompt
+    assert "1. [Pasaporte Regular · Registro Civil] Pasos: pedir turno" in prompt
+
+
+def test_rerank_sin_nombre_ni_organismo_deja_solo_el_texto():
+    prompt = _prompt_de_rerank([{"texto": "fragmento A"}])
+
+    assert "0. fragmento A" in prompt
+    assert "[" not in prompt.split("Fragmentos:")[1].split("Respondé")[0]
+
+
+def test_rerank_pide_priorizar_el_tramite_cuya_finalidad_coincide():
+    prompt = _prompt_de_rerank([{"texto": "a", "nombre_oficial": "X", "organismo": "Y"}])
+
+    assert "finalidad coincide exactamente" in prompt
+    assert "de otro organismo" in prompt
