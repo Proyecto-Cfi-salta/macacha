@@ -74,17 +74,30 @@ def _fila_a_dict(fila) -> dict:
     }
 
 
-def listar_solicitudes(conn, organismo_id: int | None) -> list[dict]:
-    query = _SELECT_SOLICITUD
+def listar_solicitudes(
+    conn, organismo_id: int | None, page: int = 1, page_size: int = 20
+) -> tuple[list[dict], int]:
+    """Pendientes primero y, dentro de cada grupo, las más nuevas arriba.
+
+    El id desempata para que la paginación sea estable (mismo orden entre páginas).
+    """
+    donde = ""
     params: tuple = ()
     if organismo_id is not None:
-        query += " WHERE s.organismo_id = %s"
+        donde = " WHERE s.organismo_id = %s"
         params = (organismo_id,)
-    query += " ORDER BY s.creado_en DESC"
 
     with conn.cursor() as cur:
-        cur.execute(query, params)
-        return [_fila_a_dict(fila) for fila in cur.fetchall()]
+        cur.execute(f"SELECT COUNT(*) FROM solicitudes_contacto s{donde}", params)
+        total = cur.fetchone()[0]
+        cur.execute(
+            _SELECT_SOLICITUD
+            + donde
+            + " ORDER BY (s.estado = 'pendiente') DESC, s.creado_en DESC, s.id"
+            + " LIMIT %s OFFSET %s",
+            params + (page_size, (page - 1) * page_size),
+        )
+        return [_fila_a_dict(fila) for fila in cur.fetchall()], total
 
 
 def obtener_solicitud(conn, solicitud_id: str) -> dict | None:

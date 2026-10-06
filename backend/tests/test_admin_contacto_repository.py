@@ -85,11 +85,13 @@ def test_listar_solicitudes_filtra_por_organismo(db_conn, clean_db):
     )
     db_conn.commit()
 
-    filtradas = contacto_repository.listar_solicitudes(db_conn, organismo_a)
+    filtradas, total_filtradas = contacto_repository.listar_solicitudes(db_conn, organismo_a)
     assert [s["nombre"] for s in filtradas] == ["A"]
+    assert total_filtradas == 1
 
-    todas = contacto_repository.listar_solicitudes(db_conn, None)
+    todas, total = contacto_repository.listar_solicitudes(db_conn, None)
     assert {s["nombre"] for s in todas} == {"A", "B"}
+    assert total == 2
 
 
 def test_resolver_destinatarios_organismo_con_admin_activo(db_conn, clean_db):

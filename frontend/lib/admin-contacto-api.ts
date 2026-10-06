@@ -21,8 +21,20 @@ export type SolicitudContactoDetalle = SolicitudContacto & {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export async function listarSolicitudesContacto(): Promise<SolicitudContacto[]> {
-  const respuesta = await fetch(`${BASE_URL}/admin/contacto`, { credentials: "include" });
+export type PaginaSolicitudesContacto = {
+  solicitudes: SolicitudContacto[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export async function listarSolicitudesContacto(
+  page: number,
+  pageSize: number
+): Promise<PaginaSolicitudesContacto> {
+  const respuesta = await fetch(`${BASE_URL}/admin/contacto?page=${page}&page_size=${pageSize}`, {
+    credentials: "include",
+  });
   if (!respuesta.ok) {
     throw new Error("No se pudo cargar la lista de contacto");
   }

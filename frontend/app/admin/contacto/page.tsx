@@ -3,23 +3,25 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CasillasContacto } from "../../../components/CasillasContacto";
-import { listarSolicitudesContacto, type SolicitudContacto } from "../../../lib/admin-contacto-api";
+import { listarSolicitudesContacto, type PaginaSolicitudesContacto } from "../../../lib/admin-contacto-api";
+
+const POR_PAGINA = 5;
 
 export default function ContactoPage() {
-  const [solicitudes, setSolicitudes] = useState<SolicitudContacto[] | null>(null);
+  const [datos, setDatos] = useState<PaginaSolicitudesContacto | null>(null);
+  const [pagina, setPagina] = useState(1);
   const [error, setError] = useState(false);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     cargar();
-  }, []);
+  }, [pagina]);
 
   async function cargar() {
     setCargando(true);
     setError(false);
     try {
-      const resultado = await listarSolicitudesContacto();
-      setSolicitudes(resultado);
+      setDatos(await listarSolicitudesContacto(pagina, POR_PAGINA));
     } catch {
       setError(true);
     } finally {
@@ -42,11 +44,14 @@ export default function ContactoPage() {
     );
   }
 
+  const solicitudes = datos?.solicitudes ?? [];
+  const totalPaginas = Math.max(1, Math.ceil((datos?.total ?? 0) / POR_PAGINA));
+
   return (
     <div className="p-4">
       <h1 className="mb-4 text-lg font-semibold">Contacto</h1>
       <CasillasContacto />
-      {solicitudes && solicitudes.length === 0 ? (
+      {datos?.total === 0 ? (
         <p className="text-sm texto-secundario">Todavía no hay solicitudes de contacto</p>
       ) : (
         <table className="w-full text-sm">
@@ -60,7 +65,7 @@ export default function ContactoPage() {
             </tr>
           </thead>
           <tbody>
-            {solicitudes!.map((solicitud) => (
+            {solicitudes.map((solicitud) => (
               <tr key={solicitud.id} className="tabla-fila">
                 <td className="p-2">{new Date(solicitud.creado_en).toLocaleString()}</td>
                 <td className="p-2">
@@ -80,6 +85,27 @@ export default function ContactoPage() {
             ))}
           </tbody>
         </table>
+      )}
+      {datos && datos.total > 0 && (
+        <div className="mt-4 flex items-center gap-4 text-sm">
+          <button
+            onClick={() => setPagina((p) => p - 1)}
+            disabled={pagina <= 1}
+            className="boton-secundario"
+          >
+            Anterior
+          </button>
+          <span>
+            Página {pagina} de {totalPaginas}
+          </span>
+          <button
+            onClick={() => setPagina((p) => p + 1)}
+            disabled={pagina >= totalPaginas}
+            className="boton-secundario"
+          >
+            Siguiente
+          </button>
+        </div>
       )}
     </div>
   );

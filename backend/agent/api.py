@@ -6,7 +6,7 @@ from functools import lru_cache, partial
 from typing import Iterator, Literal
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 import anyio
 from anyio import to_thread
 from fastapi.middleware.cors import CORSMiddleware
@@ -658,10 +658,16 @@ class ContactoEstadoPayload(BaseModel):
 
 
 @app.get("/admin/contacto")
-def admin_listar_contacto(admin: AdminActual = Depends(requiere_admin), pool=Depends(obtener_pool)):
+def admin_listar_contacto(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    admin: AdminActual = Depends(requiere_admin),
+    pool=Depends(obtener_pool),
+):
     with pool.connection() as conn:
         organismo_id = admin.organismo_id if admin.rol == "admin_organismo" else None
-        return contacto_repository.listar_solicitudes(conn, organismo_id)
+        solicitudes, total = contacto_repository.listar_solicitudes(conn, organismo_id, page, page_size)
+    return {"solicitudes": solicitudes, "total": total, "page": page, "page_size": page_size}
 
 
 def _verificar_solicitud_de_mi_organismo(conn, admin: AdminActual, solicitud: dict | None) -> None:

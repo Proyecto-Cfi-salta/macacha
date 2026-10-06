@@ -37,18 +37,19 @@ def _crear_admin_y_loguear(client, conn, rol="super_admin", organismo_id=None, e
     client.post("/admin/login", json={"email": email, "password": password})
 
 
-def _crear_solicitud(conn, organismo_id=None, tramite_id=None, nombre="Juan"):
+def _crear_solicitud(conn, organismo_id=None, tramite_id=None, nombre="Juan", estado="pendiente", creado_en=None):
     session_id = str(uuid.uuid4())
     sessions.crear_sesion_si_no_existe(conn, session_id)
     conn.commit()
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO solicitudes_contacto (session_id, tramite_id, organismo_id, nombre, email, telefono, consulta)
-            VALUES (%s, %s, %s, %s, 'x@x.com', '387', 'consulta')
+            INSERT INTO solicitudes_contacto
+                (session_id, tramite_id, organismo_id, nombre, email, telefono, consulta, estado, creado_en)
+            VALUES (%s, %s, %s, %s, 'x@x.com', '387', 'consulta', %s, COALESCE(%s, now()))
             RETURNING id
             """,
-            (session_id, tramite_id, organismo_id, nombre),
+            (session_id, tramite_id, organismo_id, nombre, estado, creado_en),
         )
         solicitud_id = str(cur.fetchone()[0])
     conn.commit()
@@ -81,7 +82,8 @@ def test_admin_organismo_solo_ve_sus_solicitudes(db_conn, clean_db, monkeypatch)
     finally:
         api.app.dependency_overrides.clear()
 
-    assert [s["nombre"] for s in respuesta.json()] == ["Propia"]
+    assert [s["nombre"] for s in respuesta.json()["solicitudes"]] == ["Propia"]
+    assert respuesta.json()["total"] == 1
 
 
 def test_super_admin_ve_todas_las_solicitudes(db_conn, clean_db, monkeypatch):
@@ -98,7 +100,7 @@ def test_super_admin_ve_todas_las_solicitudes(db_conn, clean_db, monkeypatch):
     finally:
         api.app.dependency_overrides.clear()
 
-    assert {s["nombre"] for s in respuesta.json()} == {"Con organismo", "Sin organismo"}
+    assert {s["nombre"] for s in respuesta.json()["solicitudes"]} == {"Con organismo", "Sin organismo"}
 
 
 def test_obtener_solicitud_ajena_devuelve_404(db_conn, clean_db, monkeypatch):
@@ -343,3 +345,84 @@ def test_put_casilla_admin_de_organismo_sobre_otro_organismo_devuelve_404_sin_es
 
     assert respuesta.status_code == 404
     assert _casilla_de(db_conn, ajeno) == "original@x.com"
+
+
+def _listar(client, **params):
+    return client.get("/admin/contacto", params=params)
+
+
+def _con_super_admin(db_conn, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    _crear_admin_y_loguear(client, db_conn)
+    return client
+
+
+def test_listado_pone_los_pendientes_primero_y_los_mas_nuevos_arriba(db_conn, clean_db, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    base = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
+    _crear_solicitud(db_conn, nombre="resuelta-vieja", estado="resuelto", creado_en=base)
+    _crear_solicitud(db_conn, nombre="pendiente-vieja", creado_en=base + timedelta(days=1))
+    _crear_solicitud(db_conn, nombre="resuelta-nueva", estado="resuelto", creado_en=base + timedelta(days=4))
+    _crear_solicitud(db_conn, nombre="pendiente-nueva", creado_en=base + timedelta(days=3))
+    client = _con_super_admin(db_conn, monkeypatch)
+    try:
+        respuesta = _listar(client)
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert [s["nombre"] for s in respuesta.json()["solicitudes"]] == [
+        "pendiente-nueva", "pendiente-vieja", "resuelta-nueva", "resuelta-vieja",
+    ]
+
+
+def test_listado_se_pagina_sin_repetir_ni_perder_solicitudes(db_conn, clean_db, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    base = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
+    for i in range(5):
+        _crear_solicitud(db_conn, nombre=f"s{i}", creado_en=base + timedelta(hours=i))
+    client = _con_super_admin(db_conn, monkeypatch)
+    try:
+        paginas = [_listar(client, page=n, page_size=2).json() for n in (1, 2, 3)]
+        fuera = _listar(client, page=4, page_size=2).json()
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert [len(p["solicitudes"]) for p in paginas] == [2, 2, 1]
+    assert [s["nombre"] for p in paginas for s in p["solicitudes"]] == ["s4", "s3", "s2", "s1", "s0"]
+    assert all(p["total"] == 5 and p["page_size"] == 2 for p in paginas)
+    assert [p["page"] for p in paginas] == [1, 2, 3]
+    assert fuera["solicitudes"] == [] and fuera["total"] == 5
+
+
+def test_el_total_del_admin_de_organismo_cuenta_solo_las_suyas(db_conn, clean_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "secreto-de-test")
+    propio = repo.upsert_organismo(db_conn, "Registro Civil")
+    ajeno = repo.upsert_organismo(db_conn, "Rentas")
+    for i in range(3):
+        _crear_solicitud(db_conn, organismo_id=propio, nombre=f"p{i}")
+    _crear_solicitud(db_conn, organismo_id=ajeno, nombre="ajena")
+    api.app.dependency_overrides[obtener_pool] = lambda: _FakePool(db_conn)
+    client = TestClient(api.app, base_url="https://testserver")
+    try:
+        _crear_admin_y_loguear(client, db_conn, rol="admin_organismo", organismo_id=propio)
+        respuesta = _listar(client, page_size=2)
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.json()["total"] == 3
+    assert len(respuesta.json()["solicitudes"]) == 2
+
+
+@pytest.mark.parametrize("params", [{"page": 0}, {"page": -1}, {"page_size": 0}, {"page_size": 101}])
+def test_listado_rechaza_paginacion_invalida(db_conn, clean_db, monkeypatch, params):
+    client = _con_super_admin(db_conn, monkeypatch)
+    try:
+        respuesta = _listar(client, **params)
+    finally:
+        api.app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 422
