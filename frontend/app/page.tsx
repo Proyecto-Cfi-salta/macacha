@@ -5,6 +5,7 @@ import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { ContactoHumanoModal } from "../components/ContactoHumanoModal";
 import { PanelContextual } from "../components/PanelContextual";
+import { PestanaFicha } from "../components/PestanaFicha";
 import { PanelMarca } from "../components/PanelMarca";
 import { TramiteInfoPanel } from "../components/TramiteInfoPanel";
 import { TramitesAmbiguosPanel } from "../components/TramitesAmbiguosPanel";
@@ -84,12 +85,10 @@ function Chat({ sessionId }: { sessionId: string }) {
             ))}
             {enviando && <p className="text-sm texto-secundario">escribiendo…</p>}
           </div>
-          <ChatInput
-            disabled={enviando}
-            onEnviar={enviarMensaje}
-            onAbrirFicha={() => setPanelAbierto(true)}
-          />
+          <ChatInput disabled={enviando} onEnviar={enviarMensaje} />
         </div>
+
+        {!panelAbierto && <PestanaFicha onAbrir={() => setPanelAbierto(true)} />}
 
         <PanelContextual
           abierto={panelAbierto}
